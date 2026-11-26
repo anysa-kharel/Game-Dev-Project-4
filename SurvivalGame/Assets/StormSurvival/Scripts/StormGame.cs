@@ -12,6 +12,7 @@ namespace StormSurvival
         public Generator RescueGenerator { get; set; }
         public Texture2D groundTexture, woodTexture;
         public Material surfaceMaterial, glowMaterial, particleMaterial;
+        public Material crawlspaceStoneMaterial;
         public AudioClip templateMusic;
         [Range(0.03f, 0.25f)] public float sensitivity = 0.10f;
         [Range(0f, 1f)] public float volume = 0.65f;

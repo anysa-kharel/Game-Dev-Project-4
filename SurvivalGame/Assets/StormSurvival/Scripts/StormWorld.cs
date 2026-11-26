@@ -21,6 +21,9 @@ namespace StormSurvival
         private readonly List<Bounds> shelters = new List<Bounds>();
         private readonly List<StormInteractable> fires = new List<StormInteractable>();
 
+        private const float ForestBoundaryX = 40f;
+        private const float CrouchBarrierZ = 57f;
+
         public static float Height(float z)
         {
             if (z > 128f && z < 130f) return -(z - 128f) * 1.5f;
@@ -65,7 +68,7 @@ namespace StormSurvival
             PlaceMine(new Vector3(7,0,161), false);
             PlaceMine(new Vector3(-7,Height(244),244), false);
             AddTrailLog("Early jump lesson / fallen branch", new Vector3(0f, .27f, 47f), 2.9f, .65f);
-            AddTrailLog("Early crouch lesson / low trunk", new Vector3(0f, 2f, 57f), 2.9f, 1.4f);
+            BuildCrouchBarrier();
             foreach (var p in new[] { new Vector3(4,0,17), new Vector3(-7,0,34), new Vector3(5,0,51), new Vector3(-6,0,67),
                 new Vector3(7,0,92),new Vector3(-5,0,110),new Vector3(5,0,120),new Vector3(6,0,149),
                 new Vector3(-6,0,169),new Vector3(5,0,190),new Vector3(-6,0,219),new Vector3(-6,0,245),new Vector3(5,0,254) }) WoodPile(p);
@@ -83,6 +86,66 @@ namespace StormSurvival
             // Use the visible cylinder instead of the default capsule. The 2.9 m log
             // leaves .95 m of the 4.8 m trail open on either side.
             log.AddComponent<MeshCollider>().sharedMesh = log.GetComponent<MeshFilter>().sharedMesh;
+        }
+
+        private void BuildCrouchBarrier()
+        {
+            const float halfOpening = 1.15f;
+            const float headroom = 1.15f;
+            const float lintelHeight = .35f;
+            const float wallTop = 5.9f;
+            const float wallFoot = -.12f;
+            const int sections = 7;
+            var barrier = Group("Crouch barrier", new Vector3(0f, Height(CrouchBarrierZ), CrouchBarrierZ));
+            var stone = rock;
+            if (game.crawlspaceStoneMaterial != null)
+            {
+                stone = new Material(game.crawlspaceStoneMaterial) { name = "Crawlspace stone" };
+                stone.SetTextureScale("_BaseMap", new Vector2(2f, 2f));
+                stone.SetFloat("_BumpScale", .85f);
+                ownedMaterials.Add(stone);
+            }
+
+            // The wings meet the perimeter walls, including a small overlap at their ends.
+            float wingWidth = (ForestBoundaryX + 1f - halfOpening) / sections;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                for (int section = 0; section < sections; section++)
+                {
+                    float top = 5.55f + .28f * ((section + 1) % 3);
+                    float depth = 2.1f + .24f * (section % 3);
+                    float x = side * (halfOpening + wingWidth * (section + .5f));
+                    float z = .12f * (section % 3 - 1);
+                    Shape("Rock barrier wing", PrimitiveType.Cube, barrier, new Vector3(x, (top + wallFoot) / 2f, z),
+                        new Vector3(wingWidth, top - wallFoot, depth), stone);
+                }
+            }
+
+            float rockBase = headroom + lintelHeight;
+            Shape("Rock above crawlspace", PrimitiveType.Cube, barrier, new Vector3(0f, (rockBase + wallTop) / 2f, 0f),
+                new Vector3(2f * halfOpening + .12f, wallTop - rockBase, 2.25f), stone);
+            Shape("Timber lintel", PrimitiveType.Cube, barrier, new Vector3(0f, headroom + lintelHeight / 2f, 0f),
+                new Vector3(3.2f, lintelHeight, 2.8f), Wood);
+
+            for (int entrance = -1; entrance <= 1; entrance += 2)
+            {
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    float x = side * (halfOpening + .2f);
+                    float z = entrance * 1.32f;
+                    Shape("Crawlspace post", PrimitiveType.Cube, barrier, new Vector3(x, .67f, z),
+                        new Vector3(.4f, 1.44f, .28f), Wood);
+                    Shape("Amber crawlspace marker", PrimitiveType.Cube, barrier,
+                        new Vector3(x, .87f, z + entrance * .151f), new Vector3(.26f, .09f, .035f), Amber, false);
+                }
+            }
+        }
+
+        internal static bool ApproachingCrouchBarrier(Vector3 position, Vector3 forward)
+        {
+            float distance = CrouchBarrierZ - position.z;
+            return Mathf.Abs(position.x) <= 2.5f && Mathf.Abs(distance) <= 5f &&
+                forward.z * Mathf.Sign(distance) > .28f;
         }
 
         public Material MakeMaterial(Color color, bool glow = false)
@@ -132,7 +195,7 @@ namespace StormSurvival
             }
             for(int side=-1;side<=1;side+=2)
                 for(int z=-10;z<280;z+=12)
-                    Shape("Forest boundary rocks",PrimitiveType.Cube,root,new Vector3(side*40,Height(z)+3,z),new Vector3(3,7,13),rock);
+                    Shape("Forest boundary rocks",PrimitiveType.Cube,root,new Vector3(side*ForestBoundaryX,Height(z)+3,z),new Vector3(3,7,13),rock);
             Shape("Trailhead boundary",PrimitiveType.Cube,root,new Vector3(0,3,-15),new Vector3(82,7,3),rock);
             Shape("Lookout boundary",PrimitiveType.Cube,root,new Vector3(0,Height(283)+3,283),new Vector3(82,7,3),rock);
         }
@@ -148,8 +211,11 @@ namespace StormSurvival
                         if(zz>125&&zz<146||zz>68&&zz<96&&Mathf.Abs(x)<23)continue;
                         if(game.trees==null||game.trees.Length==0)continue;
                         var prefab=game.trees[random.Next(game.trees.Length)];if(prefab==null)continue;
-                        var tree=Instantiate(prefab,new Vector3(x,Height(zz),zz),Quaternion.Euler(0,(float)random.NextDouble()*360,0),root);
-                        tree.transform.localScale*=1f+(float)random.NextDouble()*0.5f;
+                        float rotation = (float)random.NextDouble() * 360f;
+                        float scale = 1f + (float)random.NextDouble() * .5f;
+                        if (Mathf.Abs(zz - CrouchBarrierZ) < 1.95f) continue;
+                        var tree=Instantiate(prefab,new Vector3(x,Height(zz),zz),Quaternion.Euler(0,rotation,0),root);
+                        tree.transform.localScale *= scale;
                         foreach(var col in tree.GetComponentsInChildren<Collider>()){col.enabled=false;if(Application.isPlaying)Destroy(col);else DestroyImmediate(col);}
                         var trunk=tree.AddComponent<CapsuleCollider>();trunk.radius=0.45f;trunk.height=7;trunk.center=Vector3.up*3.5f;
                     }
@@ -166,6 +232,11 @@ namespace StormSurvival
             var shelter = PlaceTemplate(game.mineTemplate, new Vector3(-14,0,82), 6f, Quaternion.identity);
             if (shelter != null)
             {
+                // The old floor box extends into the forest when the shelter is scaled up.
+                if (shelter.TryGetComponent<MeshCollider>(out var shell) && shell.enabled && shell.sharedMesh != null &&
+                    shelter.TryGetComponent<BoxCollider>(out var legacyFloor))
+                    legacyFloor.enabled = false;
+
                 var renderers = shelter.GetComponentsInChildren<MeshRenderer>();
                 if (renderers.Length > 0)
                 {

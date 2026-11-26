@@ -312,14 +312,17 @@ namespace StormSurvival
             string bearing = Mathf.Abs(angle) < 20 ? "↑  Ahead" : angle > 0 ? "→  Right" : "←  Left";
             direction.text = bearing + "    ·    " + Mathf.RoundToInt(delta.magnitude) + " m";
 
-            bool hasPrompt = !string.IsNullOrEmpty(player.Prompt);
-            reticle.color = hasPrompt ? Gold : new Color(Paper.r, Paper.g, Paper.b, .88f);
-            reticle.rectTransform.localScale = hasPrompt ? Vector3.one * 1.1f : Vector3.one;
-            interaction.gameObject.SetActive(hasPrompt);
-            if (hasPrompt)
+            bool hasTarget = !string.IsNullOrEmpty(player.Prompt);
+            bool showCrouchHint = !hasTarget && !player.Crouched &&
+                StormWorld.ApproachingCrouchBarrier(player.transform.position, player.View.transform.forward);
+            reticle.color = hasTarget ? Gold : new Color(Paper.r, Paper.g, Paper.b, .88f);
+            reticle.rectTransform.localScale = hasTarget ? Vector3.one * 1.1f : Vector3.one;
+            interaction.gameObject.SetActive(hasTarget || showCrouchHint);
+            if (hasTarget || showCrouchHint)
             {
-                prompt.text = player.Prompt;
-                float progress = player.HoldProgress;
+                interaction.anchoredPosition = new Vector2(interaction.anchoredPosition.x, showCrouchHint ? -132f : -40f);
+                prompt.text = showCrouchHint ? "Hold C to crouch through" : player.Prompt;
+                float progress = hasTarget ? player.HoldProgress : 0f;
                 holdTrack.gameObject.SetActive(progress > 0);
                 holdFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(progress), 1);
             }

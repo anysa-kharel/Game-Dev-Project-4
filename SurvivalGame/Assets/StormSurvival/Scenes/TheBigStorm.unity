@@ -187,6 +187,7 @@ MonoBehaviour:
   surfaceMaterial: {fileID: 2100000, guid: c3fc031c20f25f99b99393304211803d, type: 2}
   glowMaterial: {fileID: 2100000, guid: be57828eb88957ff8b4d8b472916d849, type: 2}
   particleMaterial: {fileID: 2100000, guid: cacfa23269b25d629fe252b3412998c8, type: 2}
+  crawlspaceStoneMaterial: {fileID: 2100000, guid: 3a0bfa4f4fe3d0d4ea6ce6e157d4162a, type: 2}
   templateMusic: {fileID: 0}
   sensitivity: 0.1
   volume: 0.65
