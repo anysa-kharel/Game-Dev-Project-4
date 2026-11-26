@@ -1,0 +1,346 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Rendering;
+
+namespace StormSurvival
+{
+    public sealed class StormWorld : MonoBehaviour
+    {
+        public Material Wood { get; private set; }
+        public Material Metal { get; private set; }
+        public Material Amber { get; private set; }
+        public Light Sun { get; private set; }
+        private StormGame game;
+        private Transform root, fallingTrunk;
+        private GameObject bridge;
+        private bool isPreview;
+        private Material soil, grass, rock, plaster, roof, dark;
+        private readonly List<Material> ownedMaterials = new List<Material>();
+        private readonly List<Mesh> ownedMeshes = new List<Mesh>();
+        private readonly List<Bounds> shelters = new List<Bounds>();
+        private readonly List<StormInteractable> fires = new List<StormInteractable>();
+
+        public static float Height(float z)
+        {
+            if (z > 128f && z < 130f) return -(z - 128f) * 1.5f;
+            if (z >= 130f && z <= 142f) return -3f;
+            if (z > 142f && z < 144f) return (z - 144f) * 1.5f;
+            return z > 175f ? Mathf.Min(20f, (z - 175f) * 0.22f) : 0f;
+        }
+
+        public void Build(StormGame owner, Transform previewRoot = null)
+        {
+            game = owner;
+            isPreview = previewRoot != null;
+            root = isPreview ? previewRoot : new GameObject("The Big Storm / Environment").transform;
+            Wood = MakeMaterial(new Color(0.35f, 0.23f, 0.13f));
+            if (game.woodTexture != null) Wood.SetTexture("_BaseMap", game.woodTexture);
+            Metal = MakeMaterial(new Color(0.38f, 0.43f, 0.43f));
+            Amber = MakeMaterial(new Color(1f, 0.68f, 0.25f), true);
+            grass = MakeMaterial(new Color(0.30f, 0.37f, 0.25f));
+            if (game.groundTexture != null) grass.SetTexture("_BaseMap", game.groundTexture);
+            soil = MakeMaterial(new Color(0.35f, 0.28f, 0.18f));
+            rock = MakeMaterial(new Color(0.25f, 0.31f, 0.30f));
+            plaster = MakeMaterial(new Color(0.75f, 0.70f, 0.54f));
+            roof = MakeMaterial(new Color(0.27f, 0.18f, 0.14f));
+            dark = MakeMaterial(new Color(0.13f, 0.15f, 0.11f));
+            BuildGround(); BuildForest(); BuildLoggingCamp(); BuildRiver(); BuildLookout();
+            RingFire(new Vector3(-5, 0, 24), "Trailhead camp");
+            RingFire(new Vector3(-8, 0, 82), "Logging camp");
+            RingFire(new Vector3(-5, 0, 153), "Far-bank shelter");
+            RingFire(new Vector3(6, Height(238), 238), "Lookout camp");
+            Shelter(new Vector3(-5, 0, 24), 8f, 8f);
+            Shelter(new Vector3(-5, 0, 153), 9f, 10f);
+            Shelter(new Vector3(-4, Height(194), 194), 6f, 5f);
+            Shelter(new Vector3(4, Height(211), 211), 6f, 5f);
+            Shelter(new Vector3(-4, Height(227), 227), 6f, 5f);
+            Shelter(new Vector3(6, Height(238), 238), 8f, 7f);
+            PlaceTemplateSupplies(new Vector3(-2,0,19));
+            PlaceTemplateSupplies(new Vector3(-7,0,85));
+            PlaceTemplateSupplies(new Vector3(5,0,153));
+            PlaceTemplateSupplies(new Vector3(5,Height(239),239));
+            PlaceMine(new Vector3(-4,0,16), false);
+            PlaceMine(new Vector3(2,0,124), true);
+            PlaceMine(new Vector3(7,0,161), false);
+            PlaceMine(new Vector3(-7,Height(244),244), false);
+            var jumpLog=Shape("Early jump lesson / fallen branch",PrimitiveType.Cylinder,root,new Vector3(0,.27f,47),new Vector3(.65f,2.4f,.65f),Wood);
+            jumpLog.transform.rotation=Quaternion.Euler(0,0,90);
+            var lowLog=Shape("Early crouch lesson / low trunk",PrimitiveType.Cylinder,root,new Vector3(0,2,57),new Vector3(1.4f,3.0f,1.4f),Wood);
+            lowLog.transform.rotation=Quaternion.Euler(0,0,90);
+            foreach (var p in new[] { new Vector3(4,0,17), new Vector3(-7,0,34), new Vector3(5,0,51), new Vector3(-6,0,67),
+                new Vector3(7,0,92),new Vector3(-5,0,110),new Vector3(5,0,120),new Vector3(6,0,149),
+                new Vector3(-6,0,169),new Vector3(5,0,190),new Vector3(-6,0,219),new Vector3(-6,0,245),new Vector3(5,0,254) }) WoodPile(p);
+
+            for (int z = 10; z < 264; z += 14) if (z < 125 || z > 145) Marker(new Vector3(3f, Height(z), z));
+            LightScene();
+        }
+
+        public Material MakeMaterial(Color color, bool glow = false)
+        {
+            var template = glow ? game.glowMaterial : game.surfaceMaterial;
+            var material = template != null ? new Material(template) : new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            material.SetColor("_BaseColor", color); material.color = color; material.SetFloat("_Smoothness", 0.07f);
+            if (glow) { material.EnableKeyword("_EMISSION"); material.SetColor("_EmissionColor", color * 1.5f); }
+            ownedMaterials.Add(material); return material;
+        }
+        public GameObject Shape(string label, PrimitiveType primitive, Transform parent, Vector3 p, Vector3 scale, Material material, bool solid = true)
+        {
+            var obj = GameObject.CreatePrimitive(primitive); obj.name = label;
+            if (parent != null) obj.transform.SetParent(parent, false);
+            obj.transform.localPosition = p; obj.transform.localScale = scale;
+            obj.GetComponent<Renderer>().sharedMaterial = material;
+            if (!solid) { var c = obj.GetComponent<Collider>(); c.enabled = false; if (Application.isPlaying) Destroy(c); else DestroyImmediate(c); }
+            return obj;
+        }
+        private Transform Group(string label, Vector3 p)
+        { var obj = new GameObject(label); obj.transform.SetParent(root, false); obj.transform.position = p; return obj.transform; }
+        private void Beam(Transform parent, Vector3 a, Vector3 b, float width, Material material)
+        {
+            var obj = Shape("Timber beam", PrimitiveType.Cube, parent, (a + b) * 0.5f, new Vector3(width, width, Vector3.Distance(a,b)), material);
+            obj.transform.localRotation = Quaternion.LookRotation(b - a);
+        }
+        private void BuildGround()
+        {
+            const int nx = 41, nz = 151;
+            var vertices = new Vector3[nx*nz]; var uv = new Vector2[vertices.Length]; var indices = new int[(nx-1)*(nz-1)*6];
+            for (int z=0;z<nz;z++) for(int x=0;x<nx;x++)
+            {
+                int i=z*nx+x; float zz=-15f+z*2f; float xx=-40f+x*2f;
+                vertices[i]=new Vector3(xx,Height(zz),zz);uv[i]=new Vector2(xx*0.15f,zz*0.15f);
+            }
+            int at=0;
+            for(int z=0;z<nz-1;z++)for(int x=0;x<nx-1;x++)
+            { int a=z*nx+x,b=a+1,c=a+nx;indices[at++]=a;indices[at++]=c;indices[at++]=b;indices[at++]=b;indices[at++]=c;indices[at++]=c+1; }
+            var mesh = new Mesh { name="Forest ground and river banks",vertices=vertices,uv=uv,triangles=indices };mesh.RecalculateNormals();mesh.RecalculateBounds();ownedMeshes.Add(mesh);
+            var obj=Group("Forest terrain",Vector3.zero).gameObject;obj.AddComponent<MeshFilter>().sharedMesh=mesh;obj.AddComponent<MeshRenderer>().sharedMaterial=grass;obj.AddComponent<MeshCollider>().sharedMesh=mesh;
+            for(int z=-10;z<280;z+=4)
+            {
+                if(z>126&&z<146)continue;
+                float y=Height(z);
+                var patch=Shape("Earth trail",PrimitiveType.Cube,root,new Vector3(0,y+0.012f,z),new Vector3(4.8f,0.024f,4.1f),soil,false);
+                if(z>175)patch.transform.rotation=Quaternion.Euler(-Mathf.Atan(0.22f)*Mathf.Rad2Deg,0,0);
+            }
+            for(int side=-1;side<=1;side+=2)
+                for(int z=-10;z<280;z+=12)
+                    Shape("Forest boundary rocks",PrimitiveType.Cube,root,new Vector3(side*40,Height(z)+3,z),new Vector3(3,7,13),rock);
+            Shape("Trailhead boundary",PrimitiveType.Cube,root,new Vector3(0,3,-15),new Vector3(82,7,3),rock);
+            Shape("Lookout boundary",PrimitiveType.Cube,root,new Vector3(0,Height(283)+3,283),new Vector3(82,7,3),rock);
+        }
+        private void BuildForest()
+        {
+            var random=new System.Random(824);
+            for(int z=-5;z<276;z+=6)
+                for(int side=-1;side<=1;side+=2)
+                    for(int row=0;row<2;row++)
+                    {
+                        float x=side*(row==0?11f+(float)random.NextDouble()*7f:26f+(float)random.NextDouble()*10f);
+                        float zz=z+(float)random.NextDouble()*4;
+                        if(zz>125&&zz<146||zz>68&&zz<96&&Mathf.Abs(x)<23)continue;
+                        if(game.trees==null||game.trees.Length==0)continue;
+                        var prefab=game.trees[random.Next(game.trees.Length)];if(prefab==null)continue;
+                        var tree=Instantiate(prefab,new Vector3(x,Height(zz),zz),Quaternion.Euler(0,(float)random.NextDouble()*360,0),root);
+                        tree.transform.localScale*=1f+(float)random.NextDouble()*0.5f;
+                        foreach(var col in tree.GetComponentsInChildren<Collider>()){col.enabled=false;if(Application.isPlaying)Destroy(col);else DestroyImmediate(col);}
+                        var trunk=tree.AddComponent<CapsuleCollider>();trunk.radius=0.45f;trunk.height=7;trunk.center=Vector3.up*3.5f;
+                    }
+            for(int z=30;z<260;z+=23)
+            {
+                if(z>124&&z<147)continue;
+                float x=z%2==0?-9:9;
+                if(game.rocks!=null&&game.rocks.Length>0)
+                { var b=Instantiate(game.rocks[(z/23)%game.rocks.Length],new Vector3(x,Height(z),z),Quaternion.identity,root);b.transform.localScale*=2.2f; }
+            }
+        }
+        private void BuildLoggingCamp()
+        {
+            var shelter = PlaceTemplate(game.mineTemplate, new Vector3(-14,0,82), 6f, Quaternion.identity);
+            if (shelter != null)
+            {
+                var renderers = shelter.GetComponentsInChildren<MeshRenderer>();
+                if (renderers.Length > 0)
+                {
+                    Bounds box = renderers[0].bounds; foreach (var r in renderers) box.Encapsulate(r.bounds);
+                    shelters.Add(new Bounds(new Vector3(box.center.x,1.5f,box.center.z),new Vector3(Mathf.Max(2,box.size.x-1),3,Mathf.Max(2,box.size.z-1))));
+                }
+            }
+            var lantern = PlaceTemplate(game.lanternTemplate, new Vector3(-6,0,89), 1.0f, Quaternion.identity);
+            if (lantern != null) { var lamp = lantern.GetComponentInChildren<Lantern>(); if (lamp != null) { lamp.Fuel = 30; lamp.toggled = true; } }
+            var fuel = PlaceTemplate(game.fuelTemplate, new Vector3(6,0,86), 1.6f, Quaternion.identity);
+            if (fuel != null) { var supply = fuel.GetComponentInChildren<OilBarrel>(); supply.fuel = 8; supply.MaxFuel = 8; }
+            var crate = Shape("Cloth supply box",PrimitiveType.Cube,root,new Vector3(-7,.5f,89),new Vector3(1.2f,1,.8f),Wood);
+            var cache = crate.AddComponent<StormInteractable>(); cache.kind = StormInteractable.Kind.Cache; cache.label = "Logging supplies";
+            Marker(new Vector3(-7,0,88));
+        }
+
+        private GameObject PlaceTemplate(GameObject prefab, Vector3 position, float height, Quaternion rotation)
+        {
+            if (prefab == null) return null;
+            var obj = Instantiate(prefab, position, rotation, root); obj.name = "Template / " + prefab.name;
+            foreach (var saver in obj.GetComponentsInChildren<LocationSaver>(true)) saver.enabled = false;
+            foreach (var saver in obj.GetComponentsInChildren<SpawnObjectSaver>(true)) saver.enabled = false;
+            var renderers = obj.GetComponentsInChildren<MeshRenderer>(true);
+            if (renderers.Length > 0)
+            {
+                Bounds box = renderers[0].bounds; foreach (var r in renderers) box.Encapsulate(r.bounds);
+                obj.transform.localScale *= height / Mathf.Max(0.01f,box.size.y);
+                box = renderers[0].bounds; foreach (var r in renderers) box.Encapsulate(r.bounds);
+                obj.transform.position += new Vector3(position.x-box.center.x,position.y-box.min.y,position.z-box.center.z);
+            }
+            return obj;
+        }
+        private void PlaceTemplateSupplies(Vector3 p)
+        {
+            PlaceTemplate(game.foodTemplate,p,0.42f,Quaternion.identity);
+            var water = PlaceTemplate(game.waterTemplate,p+new Vector3(2,0,0),0.12f,Quaternion.identity);
+            if (water != null)
+            {
+                var source = water.GetComponentInChildren<WaterDrinkable>();
+                if (source != null) { source.KeepPlacedHeight = true; source.refillAble = true; source.WaterAmount = 8; }
+            }
+        }
+        public void PlaceMine(Vector3 p, bool bridgeObstacle)
+        {
+            var obj = PlaceTemplate(game.miningRockTemplate,p,bridgeObstacle?1.5f:1.1f,Quaternion.identity);
+            if (obj == null) return;
+            var mine = obj.GetComponentInChildren<Mineable>(); if (mine == null) mine = obj.AddComponent<Mineable>();
+            mine.Health = 150;
+            var reward = mine.gameObject.AddComponent<StormMineReward>(); reward.bridgeObstacle = bridgeObstacle; reward.stone = 4; reward.Bind();
+            Shape("Amber mining marker",PrimitiveType.Cube,root,p+new Vector3(0,1.7f,0),new Vector3(.45f,.12f,.12f),Amber,false);
+        }
+
+        private void BuildRiver()
+        {
+            var water=MakeMaterial(new Color(.08f,.25f,.29f));water.SetFloat("_Smoothness",.8f);
+            Shape("Cold river",PrimitiveType.Cube,root,new Vector3(0,-.65f,136),new Vector3(80,.08f,13.6f),water,false);
+            bridge=Group("Released trunk bridge",new Vector3(0,0,136.2f)).gameObject;
+            var log=Shape("Bridge trunk",PrimitiveType.Cylinder,bridge.transform,new Vector3(0,-.9f,0),new Vector3(2.2f,9.25f,2.2f),Wood,false);log.transform.localRotation=Quaternion.Euler(90,0,0);
+            Shape("Walkable flattened trunk",PrimitiveType.Cube,bridge.transform,new Vector3(0,.09f,0),new Vector3(2.3f,.18f,18.5f),Wood);
+            Shape("Bridge branch / jump reuse",PrimitiveType.Cube,bridge.transform,new Vector3(0,.38f,0),new Vector3(2.3f,.40f,.26f),Wood);
+            bridge.SetActive(false);
+            fallingTrunk=Group("Windfall above the river",new Vector3(-2,0,125));
+            var trunk=Shape("Windfall",PrimitiveType.Cylinder,fallingTrunk,new Vector3(0,1.2f,0),new Vector3(.9f,2.5f,.9f),Wood,false);
+            trunk.transform.localRotation=Quaternion.Euler(32,0,0);
+            Shape("Amber cutting band",PrimitiveType.Cylinder,fallingTrunk,new Vector3(0,1.1f,-.1f),new Vector3(.96f,.13f,.96f),Amber,false);
+
+        }
+        public void DropBridge(){StartCoroutine(FallBridge());}
+        private IEnumerator FallBridge()
+        {
+            for(float t=0;t<1.2f;t+=Time.deltaTime){fallingTrunk.rotation=Quaternion.Euler(Mathf.SmoothStep(0,75,t/1.2f),0,0);yield return null;}
+            fallingTrunk.gameObject.SetActive(false);bridge.SetActive(true);Physics.SyncTransforms();
+            game.Needs.BridgeBuilt=true;
+            game.Toast("The bridge is ready. Keep to the middle and jump its raised branch.",7f);
+        }
+        private void BuildLookout()
+        {
+            var lookout=Group("Rescue lookout",new Vector3(0,Height(258),258));
+            for(int x=-1;x<=1;x+=2)for(int z=-1;z<=1;z+=2)
+                Shape("Lookout pillar",PrimitiveType.Cube,lookout,new Vector3(x*3,4,z*3),new Vector3(.38f,8,.38f),Wood);
+            Shape("Lookout canopy",PrimitiveType.Cube,lookout,new Vector3(0,8,0),new Vector3(7,.3f,7),roof);
+            Shape("Beacon pedestal",PrimitiveType.Cylinder,lookout,new Vector3(0,.4f,0),new Vector3(2.8f,.4f,2.8f),rock);
+            var beacon=Shape("Rescue beacon",PrimitiveType.Cylinder,lookout,new Vector3(0,1,0),new Vector3(2.3f,.2f,2.3f),Metal);
+            var item=beacon.AddComponent<StormInteractable>();item.kind=StormInteractable.Kind.Beacon;item.label="Rescue beacon";
+            item.flame=Fire(lookout,new Vector3(0,1.3f,0),2f);item.flame.SetActive(false);
+            var generator = PlaceTemplate(game.generatorTemplate,new Vector3(5,Height(255),255),1.55f,Quaternion.identity);
+            if (generator != null)
+            {
+                var rescueGenerator = generator.GetComponentInChildren<Generator>();
+                rescueGenerator.MaxFuel = 1000;
+                rescueGenerator.CurrentFuel = 0;
+                rescueGenerator.Toggled = false;
+                if (!isPreview) game.RescueGenerator = rescueGenerator;
+            }
+            var spotlight = PlaceTemplate(game.spotlightTemplate,new Vector3(-4,Height(256),256),2.5f,Quaternion.Euler(-15,0,0));
+            if (spotlight != null) { var lamp = spotlight.GetComponentInChildren<Spotlight>(); if (lamp != null) { lamp.generator = generator; lamp.Toggled = true; lamp.MaxDistance = 30; } }
+            var barrel = PlaceTemplate(game.fuelTemplate,new Vector3(8,Height(250),250),1.5f,Quaternion.identity);
+            if (barrel != null) { var source = barrel.GetComponentInChildren<OilBarrel>(); source.fuel = 4; source.MaxFuel = 4; }
+
+        }
+        private void WoodPile(Vector3 p)
+        {
+            p.y=Height(p.z);var pile=Group("Renewable firewood",p);var visual=new GameObject("Branches");visual.transform.SetParent(pile,false);
+            for(int i=0;i<3;i++){var log=Shape("Branch",PrimitiveType.Cylinder,visual.transform,new Vector3((i-1)*.4f,.22f,.1f*i),new Vector3(.30f,1.2f,.30f),Wood);log.transform.localRotation=Quaternion.Euler(85,i*18,0);}
+            Shape("Amber resource wrap",PrimitiveType.Cube,visual.transform,new Vector3(0,.45f,0),new Vector3(1.4f,.1f,.18f),Amber,false);
+            var item=pile.gameObject.AddComponent<StormInteractable>();item.kind=StormInteractable.Kind.Wood;item.label="Firewood";item.model=visual;item.quantity=4;
+        }
+        private void RingFire(Vector3 p,string label)
+        {
+            var ring=Group(label,p);
+            for(int i=0;i<10;i++){float a=i*Mathf.PI*2/10;Shape("Fire ring stone",PrimitiveType.Sphere,ring,new Vector3(Mathf.Cos(a)*.8f,.15f,Mathf.Sin(a)*.8f),new Vector3(.4f,.3f,.38f),rock);}
+            Shape("Fire interaction stone",PrimitiveType.Cylinder,ring,new Vector3(0,.16f,0),new Vector3(1.3f,.16f,1.3f),dark);
+            var item=ring.gameObject.AddComponent<StormInteractable>();item.kind=StormInteractable.Kind.Campfire;item.label=label;
+            item.flame=Fire(ring,new Vector3(0,.3f,0),1f);item.flame.SetActive(false);fires.Add(item);
+        }
+        private void Shelter(Vector3 p,float width,float depth)
+        {
+            var frame=Group("Roofed windbreak",p);
+            Shape("Windbreak roof",PrimitiveType.Cube,frame,new Vector3(0,3.2f,0),new Vector3(width,.22f,depth),Wood);
+            for(int x=-1;x<=1;x+=2)for(int z=-1;z<=1;z+=2)Shape("Shelter post",PrimitiveType.Cylinder,frame,new Vector3(x*(width/2-.2f),1.6f,z*(depth/2-.2f)),new Vector3(.18f,1.6f,.18f),Wood);
+            shelters.Add(new Bounds(p+Vector3.up*1.2f,new Vector3(width-.3f,2.4f,depth-.3f)));
+        }
+        private void Marker(Vector3 p)
+        {Shape("Trail stake",PrimitiveType.Cylinder,root,p+Vector3.up*.5f,new Vector3(.14f,.5f,.14f),Wood);Shape("Amber route marker",PrimitiveType.Cube,root,p+Vector3.up*1.05f,new Vector3(.3f,.13f,.1f),Amber,false);}
+        public GameObject Fire(Transform parent,Vector3 p,float scale)
+        {
+            var obj=new GameObject("Flame and warm light");obj.transform.SetParent(parent,false);obj.transform.localPosition=p;
+            var particles=obj.AddComponent<ParticleSystem>();var main=particles.main;main.startLifetime=.65f;main.startSpeed=1.25f*scale;main.startSize=.34f*scale;main.startColor=new Color(1,.5f,.1f,.9f);main.maxParticles=100;main.gravityModifier=-.07f;
+            var emission=particles.emission;emission.rateOverTime=35;var shape=particles.shape;shape.shapeType=ParticleSystemShapeType.Cone;shape.angle=12;shape.radius=.18f*scale;
+            var renderer=particles.GetComponent<ParticleSystemRenderer>();renderer.sharedMaterial=game.particleMaterial;
+            var gradient=new Gradient();gradient.SetKeys(new[]{new GradientColorKey(new Color(1,.8f,.25f),0),new GradientColorKey(new Color(1,.17f,.03f),1)},new[]{new GradientAlphaKey(.9f,0),new GradientAlphaKey(0,1)});
+            var colors=particles.colorOverLifetime;colors.enabled=true;colors.color=gradient;
+            var light=obj.AddComponent<Light>();light.type=LightType.Point;light.color=new Color(1,.6f,.25f);light.intensity=2.8f*scale;light.range=scale<.5f?8:12;light.shadows=LightShadows.None;
+            return obj;
+        }
+        public StormPlayer CreatePlayer()
+        {
+            if (game.playerTemplate == null) throw new System.InvalidOperationException("The template player prefab reference is missing.");
+            var obj = Instantiate(game.playerTemplate); obj.name = "Template Player / Survivor";
+            var player = obj.AddComponent<StormPlayer>(); player.Initialize(game); return player;
+        }
+        public bool IsSheltered(Vector3 p){foreach(var box in shelters)if(box.Contains(p+Vector3.up))return true;return false;}
+        public bool NearBurningFire(Vector3 p){foreach(var fire in fires)if(fire.fuel>0&&Vector3.Distance(p,fire.transform.position)<7f)return true;return false;}
+        public StormInteractable NearestFire(Vector3 p)
+        {StormInteractable best=fires[0];foreach(var fire in fires)if((p-fire.transform.position).sqrMagnitude<(p-best.transform.position).sqrMagnitude)best=fire;return best;}
+        private void LightScene()
+        {
+            var sunlight = new GameObject("Storm sunlight");
+            sunlight.transform.SetParent(root, false);
+            sunlight.transform.rotation = Quaternion.Euler(44, -35, 0);
+            Sun = sunlight.AddComponent<Light>();
+            Sun.type = LightType.Directional;
+            Sun.intensity = 1.1f;
+            Sun.color = new Color(.93f, .96f, 1f);
+            Sun.shadows = LightShadows.Soft;
+            if (isPreview) return;
+
+            RenderSettings.ambientMode = AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(.50f, .58f, .58f);
+            RenderSettings.ambientEquatorColor = new Color(.34f, .40f, .34f);
+            RenderSettings.ambientGroundColor = new Color(.2f, .23f, .17f);
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogDensity = .012f;
+            RenderSettings.fogColor = new Color(.32f, .39f, .39f);
+            RenderSettings.sun = Sun;
+            QualitySettings.shadowDistance = 65;
+        }
+
+        public void ReleaseGeneratedAssets()
+        {
+            foreach (var material in ownedMaterials) DestroyGeneratedAsset(material);
+            foreach (var mesh in ownedMeshes) DestroyGeneratedAsset(mesh);
+            ownedMaterials.Clear();
+            ownedMeshes.Clear();
+        }
+
+        private void DestroyGeneratedAsset(Object asset)
+        {
+            if (asset == null) return;
+            if (Application.isPlaying) Destroy(asset);
+            else DestroyImmediate(asset);
+        }
+
+        private void OnDestroy() => ReleaseGeneratedAssets();
+    }
+}

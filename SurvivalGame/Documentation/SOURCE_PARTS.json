@@ -1,0 +1,26 @@
+{
+  "source_archives": [
+    {
+      "name": "Package-and-projectsettings.zip",
+      "files": 32,
+      "uncompressed_bytes": 67046
+    },
+    {
+      "name": "asset1.zip",
+      "files": 618,
+      "uncompressed_bytes": 488884451
+    },
+    {
+      "name": "asset2.zip",
+      "files": 849,
+      "uncompressed_bytes": 63378128
+    },
+    {
+      "name": "asset3.zip",
+      "files": 121,
+      "uncompressed_bytes": 30635066
+    }
+  ],
+  "additional_assets": "Polyeler Essential Nature Pack from the user's earlier supplied forest project",
+  "source_backup": "Reference/OriginalTemplateCodeAndScenes.zip"
+}

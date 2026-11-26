@@ -1,0 +1,27 @@
+{
+  "csharp_source_files": 44,
+  "grammar_errors": [],
+  "runtime_compatibility_compile": {
+    "firstpass": {
+      "source_count": 9,
+      "exit_code": 0,
+      "errors": 0
+    },
+    "gameplay": {
+      "source_count": 33,
+      "exit_code": 0,
+      "errors": 0
+    }
+  },
+  "survival_rules": "PASS: 24 survival rule assertions.",
+  "serialized_assets_scanned": 162,
+  "duplicate_asset_guids": [],
+  "missing_metadata": [],
+  "unresolved_gameplay_guids": {},
+  "unresolved_local_file_ids": [],
+  "main_scene_reference_fields_checked": 14,
+  "input_mode": "legacy",
+  "render_pipeline": "included PC_RPAsset in Graphics and all 6 Quality levels",
+  "exact_unity_editor_version_tested": false,
+  "playtest_completed": false
+}
