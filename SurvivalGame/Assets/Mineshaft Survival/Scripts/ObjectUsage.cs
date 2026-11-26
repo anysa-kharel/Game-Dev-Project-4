@@ -59,9 +59,18 @@ public class ObjectUsage : MonoBehaviour
 
 
 
+    private const float HarvestReach = 4f;
+    private const float UseReach = 3f;
+    private const float AimRadius = .32f;
+    private const float PickaxeContactTime = .40f;
+    private static readonly int PickaxeSwing = Animator.StringToHash("Base Layer.PickaxePunch");
+    private readonly RaycastHit[] aimHits = new RaycastHit[32];
+
     public string CurrentPrompt { get; private set; }
     public float HoldProgress { get; private set; }
     private StormInteractable holding;
+    private Component pendingHarvest;
+    private float harvestContactAt;
     private float nextSwing;
     private float grabSpring = 30f;
     private void Start()
@@ -72,31 +81,34 @@ public class ObjectUsage : MonoBehaviour
         if (OilHolder == null) OilHolder = GetComponent<OilHolder>();
         if (joint != null) { grabSpring = Mathf.Max(30f, joint.spring); ReleaseGrab(); }
     }
+
     private void Update()
     {
         if (Time.timeScale <= 0f || PlayerCam == null || inventory == null) return;
-        HidePanels(); CurrentPrompt = "";
-        bool hitSomething = Physics.Raycast(PlayerCam.transform.position, PlayerCam.transform.forward,
-            out RaycastHit hit, 4f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+        HidePanels();
+        CurrentPrompt = string.Empty;
+
+        var view = PlayerCam.transform;
+        var target = FindTarget(new Ray(view.position, view.forward), out var contact, out var directHit);
+        ApplyHarvestContact(target, contact);
         bool swing = Input.GetMouseButtonDown(0) && Time.time >= nextSwing;
         if (swing)
         {
-            nextSwing = Time.time + 0.55f;
-            if (punchAnim != null) punchAnim.SetTrigger(inventory.selected == 2 ? "PunchPick" : "PunchTorch");
+            BeginSwing(target);
+            ApplyHarvestContact(target, contact);
         }
+
         if (!Input.GetMouseButton(1)) ReleaseGrab();
-        if (!hitSomething) { CancelInteraction(); return; }
-        var adventure = hit.collider.GetComponentInParent<StormInteractable>();
-        if (adventure != null && adventure.Available)
+        if (target is StormInteractable adventure)
         {
+            if (!adventure.Available) { CancelHold(); return; }
             CurrentPrompt = adventure.Prompt;
             if (adventure.IsChoppable)
             {
-                if (inventory.selected != 2) CurrentPrompt = "Press 3 to equip the pickaxe";
-                else if (swing) adventure.Chop();
-                CancelHold(); return;
+                if (inventory.selected != 2) CurrentPrompt = "3 / equip pickaxe";
+                CancelHold();
             }
-            if (Input.GetKey(KeyCode.E))
+            else if (Input.GetKey(KeyCode.E))
             {
                 if (holding != adventure) { holding = adventure; HoldProgress = 0; }
                 HoldProgress += Time.deltaTime / adventure.HoldSeconds;
@@ -105,29 +117,27 @@ public class ObjectUsage : MonoBehaviour
             else CancelHold();
             return;
         }
+
         CancelHold();
-        var mine = hit.collider.GetComponentInParent<Mineable>();
-        if (mine != null)
+        if (target is Mineable mine)
         {
-            CurrentPrompt = inventory.selected == 2 ? "Left click / mine rock" : "Press 3 / equip pickaxe";
-            if (swing && inventory.selected == 2)
-            {
-                mine.Health -= 50f; mine.MineRefresh(); mine.Save();
-                if (pickaxeSparks != null) Destroy(Instantiate(pickaxeSparks, hit.point, Quaternion.LookRotation(hit.normal)), 2f);
-            }
+            if (mine.CanMine)
+                CurrentPrompt = inventory.selected == 2 ? "Left click / mine rock" : "3 / equip pickaxe";
             return;
         }
-        var ai = hit.collider.GetComponentInParent<AIController>();
-        if (ai != null && swing) { ai.Health -= inventory.selected == 2 ? 50f : 20f; ai.Agressive = true; }
-        if (hit.distance > 3.0f) return;
+
+        if (directHit.collider != null && swing)
+        {
+            var ai = directHit.collider.GetComponentInParent<AIController>();
+            if (ai != null)
+            {
+                ai.Health -= inventory.selected == 2 ? 50f : 20f;
+                ai.Agressive = true;
+            }
+        }
+
         bool use = Input.GetKeyDown(KeyCode.E), refill = Input.GetKeyDown(KeyCode.R);
-        var gen = hit.collider.GetComponentInParent<Generator>();
-        var lamp = hit.collider.GetComponentInParent<Lantern>();
-        var barrel = hit.collider.GetComponentInParent<OilBarrel>();
-        var food = hit.collider.GetComponentInParent<Eatable>();
-        var water = hit.collider.GetComponentInParent<WaterDrinkable>();
-        var spotlight = hit.collider.GetComponentInParent<Spotlight>();
-        if (gen != null)
+        if (target is Generator gen)
         {
             CurrentPrompt = "E / " + (gen.Toggled ? "stop generator" : "start generator") + "   |   2 then R / refill";
             Show(GeneratorPanel); Value(GenFuelSlider, gen.CurrentFuel, gen.MaxFuel);
@@ -136,7 +146,7 @@ public class ObjectUsage : MonoBehaviour
             if (refill && inventory.selected == 1 && OilHolder != null && OilHolder.HoldingNow > 0 && gen.CurrentFuel < gen.MaxFuel - 1)
             { OilHolder.HoldingNow--; gen.CurrentFuel = Mathf.Min(gen.MaxFuel, gen.CurrentFuel + 1000); OilHolder.Save(); gen.SaveStats(); Tell("Generator refilled. Press E to start it."); }
         }
-        else if (barrel != null)
+        else if (target is OilBarrel barrel)
         {
             CurrentPrompt = "2 / equip fuel cup   |   E / take fuel (" + Mathf.FloorToInt(barrel.fuel) + " left)";
             Show(TakeOilPanel); Value(OilBarrelStats, barrel.fuel, barrel.MaxFuel);
@@ -151,20 +161,20 @@ public class ObjectUsage : MonoBehaviour
                 }
             }
         }
-        else if (food != null && food.FoodAmount > 1)
+        else if (target is Eatable food)
         {
             CurrentPrompt = "E / eat from the can (" + Mathf.CeilToInt(food.FoodAmount - 1) + " servings)";
             Show(EatPanel); Value(EatSlider, food.FoodAmount, food.MaxFood);
             if (use && stats != null && (stats.Hunger < 950 || stats.Thirst < 950 || stats.Health < 950))
             { stats.Hunger = Mathf.Min(1000, stats.Hunger + food.SaturationAmount); stats.Thirst = Mathf.Min(1000, stats.Thirst + food.WaterAmount); stats.Health = Mathf.Min(1000, stats.Health + 100); food.FoodAmount--; food.Save(); Tell("Food restores hunger, thirst, and a little health."); }
         }
-        else if (water != null)
+        else if (target is WaterDrinkable water)
         {
             CurrentPrompt = "E / drink water (" + water.WaterAmount + ")"; Show(DrinkPanel);
             if (use && water.WaterAmount > 0 && stats != null && stats.Thirst < 950)
             { stats.Thirst = Mathf.Min(1000, stats.Thirst + 250); water.WaterAmount--; water.Save(); Tell("Thirst restored."); }
         }
-        else if (lamp != null)
+        else if (target is Lantern lamp)
         {
             CurrentPrompt = "E / toggle lantern   |   2 then R / refill"; Show(LampInfo); Value(fuel, lamp.Fuel, 1000);
             if (LampStatus != null) LampStatus.text = lamp.toggled ? "Active" : "Off";
@@ -172,21 +182,111 @@ public class ObjectUsage : MonoBehaviour
             if (refill && inventory.selected == 1 && OilHolder != null && OilHolder.HoldingNow > 0 && lamp.Fuel < 950)
             { OilHolder.HoldingNow--; lamp.Fuel = Mathf.Min(1000, lamp.Fuel + 900); OilHolder.Save(); lamp.SaveSettings(); Tell("Lantern refilled."); }
         }
-        else if (spotlight != null)
+        else if (target is Spotlight spotlight)
         {
             CurrentPrompt = "E / toggle spotlight"; Show(SpotlightPanel); Value(SpotDistanceSlider, spotlight.distance, spotlight.MaxDistance);
             if (SpotlightStatus != null) SpotlightStatus.text = spotlight.Toggled ? "Enabled" : "Disabled";
             if (use) spotlight.Toggle();
         }
-        var rigid = hit.rigidbody;
+        var rigid = directHit.distance <= UseReach ? directHit.rigidbody : null;
         if (rigid != null && !rigid.isKinematic && joint != null)
         {
             Show(GrabIcon);
-            if (Input.GetMouseButton(1)) { joint.connectedBody = rigid; joint.connectedAnchor = rigid.transform.InverseTransformPoint(hit.point); joint.spring = grabSpring; grabbing = true; }
+            if (Input.GetMouseButton(1)) { joint.connectedBody = rigid; joint.connectedAnchor = rigid.transform.InverseTransformPoint(directHit.point); joint.spring = grabSpring; grabbing = true; }
         }
     }
+    private void BeginSwing(Component target)
+    {
+        nextSwing = Time.time + .55f;
+        bool pickaxe = inventory.selected == 2;
+        bool animated = punchAnim != null && punchAnim.isActiveAndEnabled;
+        if (animated)
+        {
+            if (pickaxe && punchAnim.HasState(0, PickaxeSwing)) punchAnim.Play(PickaxeSwing, 0, 0f);
+            else punchAnim.SetTrigger(pickaxe ? "PunchPick" : "PunchTorch");
+        }
+
+        if (pickaxe && (target is Mineable || target is StormInteractable { IsChoppable: true }))
+        {
+            pendingHarvest = target;
+            harvestContactAt = Time.time + (animated ? PickaxeContactTime : 0f);
+        }
+    }
+
+    private void ApplyHarvestContact(Component target, RaycastHit contact)
+    {
+        if (pendingHarvest == null || Time.time < harvestContactAt) return;
+
+        var receiver = pendingHarvest;
+        pendingHarvest = null;
+        if (inventory.selected != 2 || target != receiver) return;
+
+        if (receiver is Mineable rock) rock.Strike(50f, contact.point, contact.normal);
+        else if (receiver is StormInteractable wood) wood.Chop(contact.point, contact.normal);
+    }
+
+    private Component FindTarget(Ray ray, out RaycastHit contact, out RaycastHit directHit)
+    {
+        int layers = Physics.DefaultRaycastLayers;
+        const QueryTriggerInteraction triggers = QueryTriggerInteraction.Ignore;
+        if (Physics.Raycast(ray, out directHit, HarvestReach, layers, triggers))
+        {
+            var directTarget = TargetOn(directHit.collider, directHit.distance);
+            if (directTarget != null)
+            {
+                contact = directHit;
+                return directTarget;
+            }
+        }
+
+        // Allow some aim tolerance on shallow or narrow objects. A second ray must
+        // reach the same object, so nearby targets cannot be used through walls.
+        int count = Physics.SphereCastNonAlloc(ray, AimRadius, aimHits, HarvestReach, layers, triggers);
+        Component closestTarget = null;
+        float bestScore = float.PositiveInfinity;
+        contact = default;
+        for (int i = 0; i < count; i++)
+        {
+            var candidate = aimHits[i];
+            Vector3 point = Vector3.MoveTowards(candidate.point, candidate.collider.bounds.center, .025f);
+            Vector3 offset = point - ray.origin;
+            float forward = Vector3.Dot(offset, ray.direction);
+            if (forward <= 0f) continue;
+            float distance = offset.magnitude;
+            float score = 1f - forward / distance + distance * .002f;
+            if (score >= bestScore) continue;
+
+            var candidateTarget = TargetOn(candidate.collider, distance - .025f);
+            if (candidateTarget == null ||
+                !Physics.Raycast(ray.origin, offset / distance, out var sight, distance + .03f, layers, triggers) ||
+                TargetOn(sight.collider, sight.distance) != candidateTarget) continue;
+
+            closestTarget = candidateTarget;
+            contact = sight;
+            bestScore = score;
+        }
+        return closestTarget;
+    }
+
+    private static Component TargetOn(Collider collider, float distance)
+    {
+        var adventure = collider.GetComponentInParent<StormInteractable>();
+        if (adventure != null) return distance <= HarvestReach && adventure.Available ? adventure : null;
+        var mine = collider.GetComponentInParent<Mineable>();
+        if (mine != null) return distance <= HarvestReach && mine.CanMine ? mine : null;
+        if (distance > UseReach) return null;
+
+        var food = collider.GetComponentInParent<Eatable>();
+        if (food != null && food.FoodAmount > 1) return food;
+        return (Component)collider.GetComponentInParent<WaterDrinkable>()
+            ?? (Component)collider.GetComponentInParent<Generator>()
+            ?? (Component)collider.GetComponentInParent<OilBarrel>()
+            ?? (Component)collider.GetComponentInParent<Lantern>()
+            ?? collider.GetComponentInParent<Spotlight>();
+    }
+
     private void Tell(string message) { if (StormGame.Instance != null) StormGame.Instance.Toast(message, 5f); }
-    public void CancelInteraction() { CurrentPrompt = ""; CancelHold(); }
+    public void CancelInteraction() { CurrentPrompt = string.Empty; pendingHarvest = null; CancelHold(); }
     private void CancelHold() { holding = null; HoldProgress = 0f; }
     public void ReleaseGrab() { if (joint != null) { joint.spring = 0f; joint.connectedBody = null; } grabbing = false; }
     private void Show(GameObject panel) { if (panel != null) panel.SetActive(true); }

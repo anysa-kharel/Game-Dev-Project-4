@@ -26,6 +26,8 @@ namespace StormSurvival
         private Font font;
         private Texture2D roundedTexture;
         private Texture2D backdropTexture;
+        private Texture2D reticleTexture;
+        private RawImage reticle;
         private Sprite roundedSprite;
         private RectTransform hud, menu, interaction, noticeCard;
         private Text objective, supplies, weather, weatherDetail, direction, prompt, notice;
@@ -118,8 +120,14 @@ namespace StormSurvival
             Label(shortcuts, "Craft and pause hotkeys", "Tab  Craft     ·     Esc  Pause", 4, 0, 180, 25,
                 12, Paper, TextAnchor.MiddleCenter);
 
-            var reticle = ImageAt(hud, "Reticle", Center, -2, -2, 4, 4, Paper, true);
-            reticle.color = new Color(Paper.r, Paper.g, Paper.b, .9f);
+            reticle = Place(hud, "Aim reticle", Center, -15, -15, 30, 30).gameObject.AddComponent<RawImage>();
+            reticle.rectTransform.pivot = Center;
+            reticle.rectTransform.anchoredPosition = Vector2.zero;
+            reticle.texture = reticleTexture;
+            reticle.raycastTarget = false;
+            var outline = reticle.gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color(Ink.r, Ink.g, Ink.b, .85f);
+            outline.effectDistance = new Vector2(1.2f, -1.2f);
             interaction = CardAt(hud, "Interaction", Center, -257, 40, 514, 60);
             prompt = Label(interaction, "Interaction prompt", "", 14, 3, 486, 51, 16, Paper, TextAnchor.MiddleCenter, true);
             holdTrack = Place(interaction, "Hold progress", TopLeft, 17, 50, 480, 3);
@@ -305,6 +313,8 @@ namespace StormSurvival
             direction.text = bearing + "    ·    " + Mathf.RoundToInt(delta.magnitude) + " m";
 
             bool hasPrompt = !string.IsNullOrEmpty(player.Prompt);
+            reticle.color = hasPrompt ? Gold : new Color(Paper.r, Paper.g, Paper.b, .88f);
+            reticle.rectTransform.localScale = hasPrompt ? Vector3.one * 1.1f : Vector3.one;
             interaction.gameObject.SetActive(hasPrompt);
             if (hasPrompt)
             {
@@ -483,6 +493,7 @@ namespace StormSurvival
 
         private void CreateTextures()
         {
+            CreateReticleTexture();
             const int size = 32;
             const float radius = 7f;
             roundedTexture = new Texture2D(size, size, TextureFormat.RGBA32, false) { name = "HUD corner mask" };
@@ -513,6 +524,31 @@ namespace StormSurvival
             backdropTexture.Apply(false, true);
         }
 
+        private void CreateReticleTexture()
+        {
+            const int size = 64;
+            reticleTexture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+                { name = "Aim reticle mask", wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = Mathf.Abs(x + .5f - size / 2f);
+                    float dy = Mathf.Abs(y + .5f - size / 2f);
+                    float radius = Mathf.Sqrt(dx * dx + dy * dy);
+                    float ring = Mathf.Abs(radius - 18.5f) - 1.4f;
+                    float horizontal = Mathf.Max(dy - 1.4f, Mathf.Max(21f - dx, dx - 28f));
+                    float vertical = Mathf.Max(dx - 1.4f, Mathf.Max(21f - dy, dy - 28f));
+                    float mark = Mathf.Min(Mathf.Min(ring, radius - 2.3f), Mathf.Min(horizontal, vertical));
+                    byte alpha = (byte)Mathf.RoundToInt(255 * Mathf.Clamp01(.7f - mark));
+                    pixels[y * size + x] = new Color32(255, 255, 255, alpha);
+                }
+            }
+            reticleTexture.SetPixels32(pixels);
+            reticleTexture.Apply(false, true);
+        }
+
         private static string TimeText(int seconds)
         {
             return (seconds / 60).ToString("00") + ":" + (seconds % 60).ToString("00");
@@ -523,6 +559,7 @@ namespace StormSurvival
             Destroy(roundedSprite);
             Destroy(roundedTexture);
             Destroy(backdropTexture);
+            Destroy(reticleTexture);
         }
     }
 }

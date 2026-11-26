@@ -54,15 +54,19 @@ namespace StormSurvival
                 if (regrow <= 0f) { collected = false; strikes = 0; if (model != null) model.SetActive(true); }
             }
         }
-        public void Chop()
+        public void Chop(Vector3 contact, Vector3 normal)
         {
             var game = StormGame.Instance;
-            if (!Available || !game.Needs.HasPickaxe || !IsChoppable) return;
-            strikes++; game.Audio.Play("chop", transform.position, 0.6f);
-            game.Player.Shake(0.06f);
-            if (strikes < 3) return;
-            game.AddWood(quantity); collected = true; regrow = 65f;
-            if (model != null) model.SetActive(false);
+            if (game == null || !Available || !game.Needs.HasPickaxe || !IsChoppable) return;
+
+            strikes++;
+            bool breaks = strikes >= 3;
+            StormHarvestEffects.Play(game, model, HarvestSurface.Wood, contact, normal, breaks);
+            if (!breaks) return;
+
+            collected = true;
+            regrow = 65f;
+            game.AddWood(quantity);
         }
         public void Use()
         {

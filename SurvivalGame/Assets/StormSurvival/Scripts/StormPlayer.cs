@@ -20,8 +20,14 @@ namespace StormSurvival
         private float originalHeight, originalEye, shake;
         private Vector3 originalCenter;
         private bool exhausted;
-        private ParticleSystem[] flames;
+        private Transform torchWick;
+        private Transform carriedFlame;
+        private Mesh flameMesh;
+        private MeshRenderer outerFlame, flameCore;
+        private ParticleSystemRenderer embers;
         private Light[] torchLights;
+        private MaterialPropertyBlock flameTint;
+        private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
 
         public void Initialize(StormGame owner)
         {
@@ -37,9 +43,7 @@ namespace StormSurvival
             Controller.ConfigureSpeeds(4.1f, 6.4f); Controller.SetHeadBob(false);
             Controller.Jumped += OnJump;
             Inventory.selected = 2; Inventory.Refresh();
-            flames = Inventory.Slot1.GetComponentsInChildren<ParticleSystem>(true);
-            torchLights = Inventory.Slot1.GetComponentsInChildren<Light>(true);
-            ConfigureTorchEffects();
+            BuildTorchFlame();
             Usage.PlayerCam = View; Usage.stats = Stats; Usage.inventory = Inventory; Usage.OilHolder = FuelCup;
             FuelCup.HoldingNow = 0;
             foreach (Transform part in GetComponentsInChildren<Transform>(true)) part.gameObject.layer = 2;
@@ -51,58 +55,161 @@ namespace StormSurvival
             Teleport(new Vector3(0, 0.1f, 3));
         }
 
-        private void ConfigureTorchEffects()
+        private void BuildTorchFlame()
         {
-            // The legacy fire uses large, long-lived flipbook sprites. At first-person
-            // distance these cover the camera. Keep a compact effect at the torch tip.
-            foreach (var flame in flames)
+            GameObject torch = Inventory.Slot1;
+            torchWick = torch.transform.Find("Torch/Fire");
+
+            // Keep the prefab's wick and light placement, and replace its large flipbook emitters.
+            foreach (var system in torch.GetComponentsInChildren<ParticleSystem>(true))
             {
-                if (flame == null) continue;
-                flame.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-                bool spark = flame.name.IndexOf("Spark", System.StringComparison.OrdinalIgnoreCase) >= 0;
-                var main = flame.main;
-                main.playOnAwake = false; main.prewarm = false; main.loop = true;
-                main.simulationSpace = ParticleSystemSimulationSpace.Local;
-                // Parent/animation scale may position the emitter, but must not enlarge sprites.
-                main.scalingMode = ParticleSystemScalingMode.Shape;
-                main.startSize3D = false; main.startRotation3D = false;
-                main.startSize = spark ? new ParticleSystem.MinMaxCurve(.008f, .015f) : new ParticleSystem.MinMaxCurve(.035f, .07f);
-                main.startLifetime = spark ? new ParticleSystem.MinMaxCurve(.12f, .22f) : new ParticleSystem.MinMaxCurve(.18f, .30f);
-                main.startSpeed = 0f; main.startRotation = 0f; main.gravityModifier = 0f;
-                main.startColor = spark ? new Color(1f, .76f, .30f, .70f) : new Color(1f, .65f, .25f, .80f);
-                main.maxParticles = spark ? 5 : 12;
-                var emission = flame.emission; emission.enabled = true; emission.rateOverTime = spark ? 5f : 20f;
-                emission.SetBursts(new ParticleSystem.Burst[0]);
-                var shape = flame.shape; shape.enabled = true; shape.shapeType = ParticleSystemShapeType.Sphere; shape.radius = .018f;
-                var velocity = flame.velocityOverLifetime;
-                velocity.enabled = false;
-                velocity.space = ParticleSystemSimulationSpace.World;
-                velocity.x = new ParticleSystem.MinMaxCurve(0f, 0f);
-                velocity.y = spark ? new ParticleSystem.MinMaxCurve(.20f, .35f) : new ParticleSystem.MinMaxCurve(.16f, .26f);
-                velocity.z = new ParticleSystem.MinMaxCurve(0f, 0f);
-                velocity.enabled = true;
-                var size = flame.sizeOverLifetime; size.enabled = true; size.separateAxes = false;
-                size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 1f, 1f, .15f));
-                var tint = new Gradient();
-                tint.SetKeys(new[] { new GradientColorKey(new Color(1f, .85f, .35f), 0f), new GradientColorKey(new Color(1f, .25f, .03f), 1f) },
-                    new[] { new GradientAlphaKey(.7f, 0f), new GradientAlphaKey(.45f, .35f), new GradientAlphaKey(0f, 1f) });
-                var colors = flame.colorOverLifetime; colors.enabled = true; colors.color = tint;
-                var noise = flame.noise; noise.enabled = false;
-                var sheet = flame.textureSheetAnimation; sheet.enabled = false;
-                var sizeSpeed = flame.sizeBySpeed; sizeSpeed.enabled = false;
-                var colorSpeed = flame.colorBySpeed; colorSpeed.enabled = false;
-                var force = flame.forceOverLifetime; force.enabled = false;
-                var trails = flame.trails; trails.enabled = false;
-                var renderer = flame.GetComponent<ParticleSystemRenderer>();
-                if (renderer == null) continue;
-                renderer.sharedMaterial = game.particleMaterial;
-                renderer.renderMode = ParticleSystemRenderMode.Billboard;
-                renderer.minParticleSize = 0f; renderer.maxParticleSize = spark ? .012f : .045f;
-                renderer.sortingFudge = 0f; renderer.cameraVelocityScale = 0f;
-                renderer.velocityScale = 0f; renderer.lengthScale = 1f;
-                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                renderer.receiveShadows = false;
+                system.Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
+                var main = system.main;
+                main.playOnAwake = false;
+                var renderer = system.GetComponent<ParticleSystemRenderer>();
+                renderer.enabled = false;
             }
+            torchLights = torch.GetComponentsInChildren<Light>(true);
+            foreach (var light in torchLights) light.enabled = false;
+            if (torchWick == null || game.particleMaterial == null) return;
+
+            carriedFlame = new GameObject("Carried torch flame").transform;
+            carriedFlame.SetParent(transform, false);
+            carriedFlame.gameObject.SetActive(false);
+            flameTint = new MaterialPropertyBlock();
+            flameMesh = CreateFlameMesh();
+            outerFlame = AddFlameLayer("Orange flame");
+            flameCore = AddFlameLayer("Gold flame core");
+            flameCore.transform.localPosition = new Vector3(0, .018f, -.003f);
+            flameCore.sortingOrder = 1;
+
+            var sparks = new GameObject("Torch embers");
+            sparks.transform.SetParent(carriedFlame, false);
+            sparks.transform.localPosition = Vector3.up * .035f;
+            var particles = sparks.AddComponent<ParticleSystem>();
+            var particleMain = particles.main;
+            particleMain.loop = true;
+            particleMain.playOnAwake = true;
+            particleMain.simulationSpace = ParticleSystemSimulationSpace.Local;
+            particleMain.startLifetime = new ParticleSystem.MinMaxCurve(.17f, .35f);
+            particleMain.startSpeed = 0f;
+            particleMain.startSize = new ParticleSystem.MinMaxCurve(.004f, .009f);
+            particleMain.startColor = new Color(1f, .56f, .13f, .95f);
+            particleMain.maxParticles = 5;
+            var emission = particles.emission;
+            emission.rateOverTime = 7f;
+            var shape = particles.shape;
+            shape.shapeType = ParticleSystemShapeType.Sphere;
+            shape.radius = .026f;
+            var velocity = particles.velocityOverLifetime;
+            velocity.x = new ParticleSystem.MinMaxCurve(-.10f, .10f);
+            velocity.y = new ParticleSystem.MinMaxCurve(.26f, .36f);
+            velocity.z = new ParticleSystem.MinMaxCurve(-.02f, .02f);
+            velocity.enabled = true;
+            var fade = particles.colorOverLifetime;
+            fade.color = new Gradient
+            {
+                colorKeys = new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(1f, .58f, .28f), 1f) },
+                alphaKeys = new[] { new GradientAlphaKey(.9f, 0f), new GradientAlphaKey(0f, 1f) }
+            };
+            fade.enabled = true;
+            embers = particles.GetComponent<ParticleSystemRenderer>();
+            embers.sharedMaterial = game.particleMaterial;
+            embers.maxParticleSize = .014f;
+            embers.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            embers.receiveShadows = false;
+        }
+
+        private MeshRenderer AddFlameLayer(string name)
+        {
+            var layer = new GameObject(name, typeof(MeshFilter), typeof(MeshRenderer));
+            layer.transform.SetParent(carriedFlame, false);
+            layer.GetComponent<MeshFilter>().sharedMesh = flameMesh;
+            var renderer = layer.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial = game.particleMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            return renderer;
+        }
+
+        private static Mesh CreateFlameMesh()
+        {
+            // Each row feathers its outline to transparent while the center stays bright.
+            float[] heights = { 0f, .13f, .31f, .51f, .70f, .89f, 1f };
+            float[] halfWidths = { .27f, .42f, .50f, .40f, .29f, .13f, .02f };
+            float[] centers = { 0f, -.025f, -.08f, -.10f, -.01f, .15f, .24f };
+            float[] opacity = { .45f, .85f, .96f, .9f, .76f, .42f, 0f };
+            float[] edgeOffsets = { -1f, -.54f, .54f, 1f };
+            int stride = edgeOffsets.Length;
+            var vertices = new Vector3[heights.Length * stride];
+            var colors = new Color[vertices.Length];
+            var uv = new Vector2[vertices.Length];
+            var triangles = new int[(heights.Length - 1) * (stride - 1) * 6];
+            int nextTriangle = 0;
+            for (int row = 0; row < heights.Length; row++)
+            {
+                for (int col = 0; col < stride; col++)
+                {
+                    int index = row * stride + col;
+                    vertices[index] = new Vector3(centers[row] + halfWidths[row] * edgeOffsets[col], heights[row], 0);
+                    colors[index] = new Color(1f, 1f, 1f, col == 0 || col == stride - 1 ? 0f : opacity[row]);
+                    uv[index] = new Vector2(.5f, .5f);
+                    if (row == heights.Length - 1 || col == stride - 1) continue;
+                    triangles[nextTriangle++] = index;
+                    triangles[nextTriangle++] = index + stride;
+                    triangles[nextTriangle++] = index + 1;
+                    triangles[nextTriangle++] = index + 1;
+                    triangles[nextTriangle++] = index + stride;
+                    triangles[nextTriangle++] = index + stride + 1;
+                }
+            }
+
+            var mesh = new Mesh
+            {
+                name = "Torch flame silhouette",
+                vertices = vertices,
+                colors = colors,
+                uv = uv,
+                triangles = triangles
+            };
+            return mesh;
+        }
+
+        private void AnimateTorchFlame()
+        {
+            bool burning = game.Needs.HasTorch && game.Needs.TorchLit && Inventory.Slot1.activeInHierarchy;
+            foreach (var light in torchLights) light.enabled = burning;
+            if (carriedFlame == null) return;
+            if (carriedFlame.gameObject.activeSelf != burning) carriedFlame.gameObject.SetActive(burning);
+            if (!burning) return;
+
+            // Use the wick's animated position but render in world units and face the camera.
+            var camera = View.transform;
+            Vector3 towardWick = torchWick.position - camera.position;
+            if (towardWick.sqrMagnitude < .001f) return;
+            Vector3 facing = towardWick.normalized;
+            carriedFlame.SetPositionAndRotation(torchWick.position - facing * .022f, Quaternion.LookRotation(facing, camera.up));
+
+            float phase = Time.time * 13f;
+            float flicker = Mathf.PerlinNoise(phase, 1.2f);
+            float sway = (Mathf.PerlinNoise(phase * .73f, 3.4f) - .5f) * 32f;
+            outerFlame.transform.localScale = new Vector3(.081f + .014f * flicker, .119f + .047f * flicker, 1f);
+            outerFlame.transform.localRotation = Quaternion.Euler(0, 0, sway);
+            flameCore.transform.localScale = new Vector3(.039f + .012f * flicker, .077f + .028f * flicker, 1f);
+            flameCore.transform.localRotation = Quaternion.Euler(0, 0, sway * .7f);
+
+            Vector3 viewport = View.WorldToViewportPoint(torchWick.position);
+            float offsetFromAim = Mathf.Abs(viewport.x - .5f) * View.aspect;
+            float visibility = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.09f, .22f, offsetFromAim));
+            TintFlame(outerFlame, new Color(1f, .34f + flicker * .11f, .035f, .92f * visibility));
+            TintFlame(flameCore, new Color(1f, .86f, .31f, .95f * visibility));
+            TintFlame(embers, new Color(1f, 1f, 1f, visibility));
+        }
+
+        private void TintFlame(Renderer renderer, Color color)
+        {
+            flameTint.SetColor(BaseColor, color);
+            renderer.SetPropertyBlock(flameTint);
         }
 
         private void OnJump() { game.Needs.Stamina = Mathf.Max(0, game.Needs.Stamina - 16f); }
@@ -140,20 +247,15 @@ namespace StormSurvival
         private void LateUpdate()
         {
             if (game == null) return;
-            bool burning = game.Needs.TorchLit && Inventory.selected == 0 && game.Needs.HasTorch;
-            foreach (var light in torchLights) if (light != null) light.enabled = burning;
-            foreach (var flame in flames)
+            if (game.Running && Controller.IsReady)
             {
-                if (flame == null) continue;
-                if (burning && !flame.isPlaying && flame.gameObject.activeInHierarchy) flame.Play();
-                else if (!burning && flame.isPlaying) flame.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                Vector3 eye = View.transform.localPosition;
+                eye.y = Mathf.Lerp(eye.y, originalEye - (Crouched ? originalHeight - 1.05f : 0f), Time.deltaTime * 12f);
+                View.transform.localPosition = eye;
+                shake = Mathf.MoveTowards(shake, 0f, Time.deltaTime);
+                if (shake > 0f) View.transform.localRotation *= Quaternion.Euler(Mathf.Sin(Time.time * 55f) * shake * 2f, 0, 0);
             }
-            if (!game.Running || !Controller.IsReady) return;
-            Vector3 eye = View.transform.localPosition;
-            eye.y = Mathf.Lerp(eye.y, originalEye - (Crouched ? originalHeight - 1.05f : 0f), Time.deltaTime * 12f);
-            View.transform.localPosition = eye;
-            shake = Mathf.MoveTowards(shake, 0f, Time.deltaTime);
-            if (shake > 0f) View.transform.localRotation *= Quaternion.Euler(Mathf.Sin(Time.time * 55f) * shake * 2f, 0, 0);
+            AnimateTorchFlame();
         }
 
         public void Teleport(Vector3 feet)
@@ -164,6 +266,10 @@ namespace StormSurvival
         }
         public void ResetMotion() { exhausted = false; Usage.CancelInteraction(); }
         public void Shake(float amount) { shake = Mathf.Max(shake, amount); }
-        private void OnDestroy() { if (Controller != null) Controller.Jumped -= OnJump; }
+        private void OnDestroy()
+        {
+            if (Controller != null) Controller.Jumped -= OnJump;
+            if (flameMesh != null) Destroy(flameMesh);
+        }
     }
 }

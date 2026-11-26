@@ -64,16 +64,25 @@ namespace StormSurvival
             PlaceMine(new Vector3(2,0,124), true);
             PlaceMine(new Vector3(7,0,161), false);
             PlaceMine(new Vector3(-7,Height(244),244), false);
-            var jumpLog=Shape("Early jump lesson / fallen branch",PrimitiveType.Cylinder,root,new Vector3(0,.27f,47),new Vector3(.65f,2.4f,.65f),Wood);
-            jumpLog.transform.rotation=Quaternion.Euler(0,0,90);
-            var lowLog=Shape("Early crouch lesson / low trunk",PrimitiveType.Cylinder,root,new Vector3(0,2,57),new Vector3(1.4f,3.0f,1.4f),Wood);
-            lowLog.transform.rotation=Quaternion.Euler(0,0,90);
+            AddTrailLog("Early jump lesson / fallen branch", new Vector3(0f, .27f, 47f), 2.9f, .65f);
+            AddTrailLog("Early crouch lesson / low trunk", new Vector3(0f, 2f, 57f), 2.9f, 1.4f);
             foreach (var p in new[] { new Vector3(4,0,17), new Vector3(-7,0,34), new Vector3(5,0,51), new Vector3(-6,0,67),
                 new Vector3(7,0,92),new Vector3(-5,0,110),new Vector3(5,0,120),new Vector3(6,0,149),
                 new Vector3(-6,0,169),new Vector3(5,0,190),new Vector3(-6,0,219),new Vector3(-6,0,245),new Vector3(5,0,254) }) WoodPile(p);
 
             for (int z = 10; z < 264; z += 14) if (z < 125 || z > 145) Marker(new Vector3(3f, Height(z), z));
             LightScene();
+        }
+
+        private void AddTrailLog(string label, Vector3 center, float width, float diameter)
+        {
+            var scale = new Vector3(diameter, width * .5f, diameter);
+            var log = Shape(label, PrimitiveType.Cylinder, root, center, scale, Wood, false);
+            log.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+
+            // Use the visible cylinder instead of the default capsule. The 2.9 m log
+            // leaves .95 m of the 4.8 m trail open on either side.
+            log.AddComponent<MeshCollider>().sharedMesh = log.GetComponent<MeshFilter>().sharedMesh;
         }
 
         public Material MakeMaterial(Color color, bool glow = false)
@@ -238,10 +247,15 @@ namespace StormSurvival
             for(int x=-1;x<=1;x+=2)for(int z=-1;z<=1;z+=2)
                 Shape("Lookout pillar",PrimitiveType.Cube,lookout,new Vector3(x*3,4,z*3),new Vector3(.38f,8,.38f),Wood);
             Shape("Lookout canopy",PrimitiveType.Cube,lookout,new Vector3(0,8,0),new Vector3(7,.3f,7),roof);
-            Shape("Beacon pedestal",PrimitiveType.Cylinder,lookout,new Vector3(0,.4f,0),new Vector3(2.8f,.4f,2.8f),rock);
-            var beacon=Shape("Rescue beacon",PrimitiveType.Cylinder,lookout,new Vector3(0,1,0),new Vector3(2.3f,.2f,2.3f),Metal);
-            var item=beacon.AddComponent<StormInteractable>();item.kind=StormInteractable.Kind.Beacon;item.label="Rescue beacon";
-            item.flame=Fire(lookout,new Vector3(0,1.3f,0),2f);item.flame.SetActive(false);
+            var beacon = new GameObject("Rescue beacon").transform;
+            beacon.SetParent(lookout, false);
+            Shape("Beacon pedestal", PrimitiveType.Cylinder, beacon, new Vector3(0, .4f, 0), new Vector3(2.8f, .4f, 2.8f), rock);
+            Shape("Beacon bowl", PrimitiveType.Cylinder, beacon, new Vector3(0, 1, 0), new Vector3(2.3f, .2f, 2.3f), Metal);
+            var item = beacon.gameObject.AddComponent<StormInteractable>();
+            item.kind = StormInteractable.Kind.Beacon;
+            item.label = "Rescue beacon";
+            item.flame = Fire(beacon, new Vector3(0, 1.3f, 0), 2f);
+            item.flame.SetActive(false);
             var generator = PlaceTemplate(game.generatorTemplate,new Vector3(5,Height(255),255),1.55f,Quaternion.identity);
             if (generator != null)
             {

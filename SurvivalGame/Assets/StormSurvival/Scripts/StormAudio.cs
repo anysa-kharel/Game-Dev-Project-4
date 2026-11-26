@@ -11,7 +11,10 @@ namespace StormSurvival
         {
             game=owner;
             Add("step",.14f,90,.65f,.6f);Add("collect",.3f,620,.06f,.5f);
-            Add("chop",.30f,140,.75f,.7f);Add("timber",1.3f,60,.7f,.75f);
+            AddHarvestSound("chop", HarvestSurface.Wood, false);
+            AddHarvestSound("wood split", HarvestSurface.Wood, true);
+            AddHarvestSound("stone strike", HarvestSurface.Stone, false);
+            AddHarvestSound("stone crumble", HarvestSurface.Stone, true);
             Add("water",.75f,120,.85f,.6f);Add("fire",.65f,150,.8f,.4f);
             Add("craft",.55f,480,.15f,.5f);Add("checkpoint",.7f,650,.01f,.5f);
             Add("thunder",2f,40,.5f,.7f);Add("failure",1f,65,.2f,.6f);Add("success",2f,440,.01f,.65f);
@@ -39,11 +42,74 @@ namespace StormSurvival
             }
             var clip=AudioClip.Create("Storm / "+name,data.Length,1,rate,false);clip.SetData(data,0);clips[name]=clip;
         }
-        public void Play(string name,Vector3 position,float volume)
+        private void AddHarvestSound(string name, HarvestSurface surface, bool breaks)
         {
-            if(!clips.TryGetValue(name,out AudioClip clip))return;
-            var obj=new GameObject("Sound / "+name);obj.transform.position=position;
-            var source=obj.AddComponent<AudioSource>();source.clip=clip;source.volume=volume;source.spatialBlend=0f;source.Play();Destroy(obj,clip.length+.1f);
+            bool wood = surface == HarvestSurface.Wood;
+            const int rate = 22050;
+            float duration = breaks ? .52f : .25f;
+            var data = new float[Mathf.CeilToInt(rate * duration)];
+            var random = new System.Random((wood ? 121 : 365) + (breaks ? 20 : 0));
+            float softened = 0f;
+            for (int i = 0; i < data.Length; i++)
+            {
+                float time = (float)i / rate;
+                float cycle = time * 2f * Mathf.PI;
+                float noise = (float)random.NextDouble() * 2f - 1f;
+                softened = softened * .86f + noise * .14f;
+                float bright = noise - softened;
+                float impact = wood
+                    ? (.40f * Mathf.Sin(cycle * 103f) + .17f * Mathf.Sin(cycle * 287f)) * Mathf.Exp(-42f * time)
+                        + (.81f * softened + .36f * bright) * Mathf.Exp(-93f * time)
+                    : (.23f * Mathf.Sin(cycle * 970f) + .16f * Mathf.Sin(cycle * 1580f)) * Mathf.Exp(-42f * time)
+                        + (.18f * Mathf.Sin(cycle * 188f) + .62f * bright) * Mathf.Exp(-88f * time);
+                if (breaks)
+                {
+                    impact += softened * .65f * Tail(time, .040f, 12f);
+                    impact += bright * (wood ? .54f : .33f) * Tail(time, .082f, 38f);
+                    impact += softened * .58f * Tail(time, .153f, 22f);
+                }
+                data[i] = Mathf.Clamp(impact, -.95f, .95f) * Mathf.Clamp01(time * 4000f)
+                    * Mathf.Clamp01((duration - time) * 35f);
+            }
+            var clip = AudioClip.Create("Storm / " + name, data.Length, 1, rate, false);
+            clip.SetData(data, 0);
+            clips[name] = clip;
+        }
+
+        private static float Tail(float time, float onset, float decay)
+        {
+            float elapsed = time - onset;
+            return elapsed < 0f ? 0f : Mathf.Min(1f, elapsed * 260f) * Mathf.Exp(-elapsed * decay);
+        }
+
+        public void PlayHarvest(HarvestSurface surface, bool breaks, Vector3 position)
+        {
+            string name = surface == HarvestSurface.Wood
+                ? (breaks ? "wood split" : "chop")
+                : (breaks ? "stone crumble" : "stone strike");
+            PlayClip(name, position, breaks ? .92f : .78f, .85f);
+        }
+
+        public void Play(string name, Vector3 position, float volume)
+        {
+            PlayClip(name, position, volume, 0f);
+        }
+
+        private void PlayClip(string name, Vector3 position, float volume, float spatialBlend)
+        {
+            if (!clips.TryGetValue(name, out AudioClip clip)) return;
+            var sound = new GameObject("Sound / " + name);
+            sound.transform.SetParent(transform, false);
+            sound.transform.position = position;
+            var source = sound.AddComponent<AudioSource>();
+            source.clip = clip;
+            source.volume = volume;
+            source.spatialBlend = spatialBlend;
+            source.minDistance = 2.5f;
+            source.maxDistance = 18f;
+            source.dopplerLevel = 0f;
+            source.Play();
+            Destroy(sound, clip.length + .1f);
         }
         private void Update(){if(game!=null)AudioListener.volume=game.volume;}
         private void OnDestroy(){foreach(var clip in clips.Values)if(clip!=null)Destroy(clip);AudioListener.volume=1f;}
