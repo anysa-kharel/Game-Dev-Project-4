@@ -313,15 +313,20 @@ namespace StormSurvival
             direction.text = bearing + "    ·    " + Mathf.RoundToInt(delta.magnitude) + " m";
 
             bool hasTarget = !string.IsNullOrEmpty(player.Prompt);
-            bool showCrouchHint = !hasTarget && !player.Crouched &&
-                StormWorld.ApproachingCrouchBarrier(player.transform.position, player.View.transform.forward);
+            Vector3 position = player.transform.position;
+            Vector3 viewDirection = player.View.transform.forward;
+            bool showCrouchHint = !hasTarget && !player.Crouched && StormWorld.ApproachingCrouchBarrier(position, viewDirection);
+            bool showRouteHint = !hasTarget && StormRidgeRoute.ApproachingFork(position, viewDirection);
+            bool showNavigationHint = showCrouchHint || showRouteHint;
             reticle.color = hasTarget ? Gold : new Color(Paper.r, Paper.g, Paper.b, .88f);
             reticle.rectTransform.localScale = hasTarget ? Vector3.one * 1.1f : Vector3.one;
-            interaction.gameObject.SetActive(hasTarget || showCrouchHint);
-            if (hasTarget || showCrouchHint)
+            interaction.gameObject.SetActive(hasTarget || showNavigationHint);
+            if (hasTarget || showNavigationHint)
             {
-                interaction.anchoredPosition = new Vector2(interaction.anchoredPosition.x, showCrouchHint ? -132f : -40f);
-                prompt.text = showCrouchHint ? "Hold C to crouch through" : player.Prompt;
+                interaction.anchoredPosition = new Vector2(interaction.anchoredPosition.x, showNavigationHint ? -132f : -40f);
+                if (showCrouchHint) prompt.text = "Hold C to crouch through";
+                else if (showRouteHint) prompt.text = "Left for cover  ·  Straight for the shortcut";
+                else prompt.text = player.Prompt;
                 float progress = hasTarget ? player.HoldProgress : 0f;
                 holdTrack.gameObject.SetActive(progress > 0);
                 holdFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(progress), 1);
@@ -358,9 +363,15 @@ namespace StormSurvival
                 weatherDetail.text = "Crouch or use a windbreak";
                 weather.color = Alert;
             }
+            else if (game.Weather.GustWarning)
+            {
+                weather.text = "GUST COMING";
+                weatherDetail.text = "Take cover or hold C to brace";
+                weather.color = Alert;
+            }
             else
             {
-                weather.text = "EXPOSED RIDGE";
+                weather.text = "RIDGE LULL";
                 weatherDetail.text = "Next gust in " + Mathf.CeilToInt(game.Weather.UntilGust) + " s";
             }
         }

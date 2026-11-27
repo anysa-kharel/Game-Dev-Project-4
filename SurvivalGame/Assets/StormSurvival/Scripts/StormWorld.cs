@@ -11,6 +11,7 @@ namespace StormSurvival
         public Material Metal { get; private set; }
         public Material Amber { get; private set; }
         public Light Sun { get; private set; }
+        public StormSearchlight Searchlight { get; private set; }
         private StormGame game;
         private Transform root, fallingTrunk;
         private GameObject bridge;
@@ -19,6 +20,7 @@ namespace StormSurvival
         private readonly List<Material> ownedMaterials = new List<Material>();
         private readonly List<Mesh> ownedMeshes = new List<Mesh>();
         private readonly List<Bounds> shelters = new List<Bounds>();
+        private readonly List<(Transform Tree, Quaternion BaseRotation)> ridgeTrees = new List<(Transform, Quaternion)>();
         private readonly List<StormInteractable> fires = new List<StormInteractable>();
 
         private const float ForestBoundaryX = 40f;
@@ -55,9 +57,7 @@ namespace StormSurvival
             RingFire(new Vector3(6, Height(238), 238), "Lookout camp");
             Shelter(new Vector3(-5, 0, 24), 8f, 8f);
             Shelter(new Vector3(-5, 0, 153), 9f, 10f);
-            Shelter(new Vector3(-4, Height(194), 194), 6f, 5f);
-            Shelter(new Vector3(4, Height(211), 211), 6f, 5f);
-            Shelter(new Vector3(-4, Height(227), 227), 6f, 5f);
+            StormRidgeRoute.Build(this, root, shelters.Add, PlaceTemplateSupplies);
             Shelter(new Vector3(6, Height(238), 238), 8f, 7f);
             PlaceTemplateSupplies(new Vector3(-2,0,19));
             PlaceTemplateSupplies(new Vector3(-7,0,85));
@@ -217,7 +217,21 @@ namespace StormSurvival
                         var tree=Instantiate(prefab,new Vector3(x,Height(zz),zz),Quaternion.Euler(0,rotation,0),root);
                         tree.transform.localScale *= scale;
                         foreach(var col in tree.GetComponentsInChildren<Collider>()){col.enabled=false;if(Application.isPlaying)Destroy(col);else DestroyImmediate(col);}
-                        var trunk=tree.AddComponent<CapsuleCollider>();trunk.radius=0.45f;trunk.height=7;trunk.center=Vector3.up*3.5f;
+                        var trunkOwner = tree;
+                        if (!isPreview && row == 0 && zz >= 180f && zz <= 236f)
+                        {
+                            // Bend the visible tree while keeping the trunk collider at its rest pose.
+                            trunkOwner = new GameObject("Ridge tree trunk collision");
+                            trunkOwner.layer = tree.layer;
+                            trunkOwner.transform.SetParent(root, false);
+                            trunkOwner.transform.SetPositionAndRotation(tree.transform.position, tree.transform.rotation);
+                            trunkOwner.transform.localScale = tree.transform.localScale;
+                            ridgeTrees.Add((tree.transform, tree.transform.localRotation));
+                        }
+                        var trunk = trunkOwner.AddComponent<CapsuleCollider>();
+                        trunk.radius = .45f;
+                        trunk.height = 7f;
+                        trunk.center = Vector3.up * 3.5f;
                     }
             for(int z=30;z<260;z+=23)
             {
@@ -227,6 +241,16 @@ namespace StormSurvival
                 { var b=Instantiate(game.rocks[(z/23)%game.rocks.Length],new Vector3(x,Height(z),z),Quaternion.identity,root);b.transform.localScale*=2.2f; }
             }
         }
+        public void SwayRidgeTrees(float strength)
+        {
+            foreach (var (tree, rest) in ridgeTrees)
+            {
+                float phase = Time.time * 3.2f + tree.position.z * .31f;
+                float bend = strength * (2.3f + 1.5f * Mathf.Sin(phase));
+                tree.localRotation = Quaternion.AngleAxis(-bend, Vector3.forward) * rest;
+            }
+        }
+
         private void BuildLoggingCamp()
         {
             var shelter = PlaceTemplate(game.mineTemplate, new Vector3(-14,0,82), 6f, Quaternion.identity);
@@ -251,6 +275,7 @@ namespace StormSurvival
             var crate = Shape("Cloth supply box",PrimitiveType.Cube,root,new Vector3(-7,.5f,89),new Vector3(1.2f,1,.8f),Wood);
             var cache = crate.AddComponent<StormInteractable>(); cache.kind = StormInteractable.Kind.Cache; cache.label = "Logging supplies";
             Marker(new Vector3(-7,0,88));
+            StormSupplySled.Build(game, this, root, new Vector3(5.1f, 0f, 79.5f), isPreview);
         }
 
         private GameObject PlaceTemplate(GameObject prefab, Vector3 position, float height, Quaternion rotation)
@@ -271,8 +296,13 @@ namespace StormSurvival
         }
         private void PlaceTemplateSupplies(Vector3 p)
         {
-            PlaceTemplate(game.foodTemplate,p,0.42f,Quaternion.identity);
-            var water = PlaceTemplate(game.waterTemplate,p+new Vector3(2,0,0),0.12f,Quaternion.identity);
+            PlaceTemplateSupplies(p, p + Vector3.right * 2f);
+        }
+
+        private void PlaceTemplateSupplies(Vector3 foodPosition, Vector3 waterPosition)
+        {
+            PlaceTemplate(game.foodTemplate, foodPosition, .42f, Quaternion.identity);
+            var water = PlaceTemplate(game.waterTemplate, waterPosition, .12f, Quaternion.identity);
             if (water != null)
             {
                 var source = water.GetComponentInChildren<WaterDrinkable>();
@@ -336,8 +366,9 @@ namespace StormSurvival
                 rescueGenerator.Toggled = false;
                 if (!isPreview) game.RescueGenerator = rescueGenerator;
             }
-            var spotlight = PlaceTemplate(game.spotlightTemplate,new Vector3(-4,Height(256),256),2.5f,Quaternion.Euler(-15,0,0));
-            if (spotlight != null) { var lamp = spotlight.GetComponentInChildren<Spotlight>(); if (lamp != null) { lamp.generator = generator; lamp.Toggled = true; lamp.MaxDistance = 30; } }
+            var spotlight = PlaceTemplate(game.spotlightTemplate, new Vector3(-4f, Height(256f), 256f), 2.5f, Quaternion.identity);
+            var power = generator != null ? generator.GetComponentInChildren<Generator>() : null;
+            Searchlight = StormSearchlight.Build(game, this, lookout, power, spotlight);
             var barrel = PlaceTemplate(game.fuelTemplate,new Vector3(8,Height(250),250),1.5f,Quaternion.identity);
             if (barrel != null) { var source = barrel.GetComponentInChildren<OilBarrel>(); source.fuel = 4; source.MaxFuel = 4; }
 

@@ -4,9 +4,16 @@ namespace StormSurvival
 {
     public sealed class StormWeather : MonoBehaviour
     {
+        private const float GustPeriod = 15f;
+        private const float GustStart = 10f;
+        private const float GustEnd = 14f;
+        private const float WarningDuration = 2.6f;
+
         public float Intensity { get; private set; } = 0.15f;
-        public bool Gusting => game != null && game.Elapsed % 15f >= 10f && game.Elapsed % 15f < 14f;
-        public float UntilGust => Mathf.Max(0f, 10f - game.Elapsed % 15f);
+        private float GustPhase => game != null ? game.Elapsed % GustPeriod : 0f;
+        public bool Gusting => GustPhase >= GustStart && GustPhase < GustEnd;
+        public float UntilGust => GustPhase < GustEnd ? Mathf.Max(0f, GustStart - GustPhase) : GustPeriod + GustStart - GustPhase;
+        public bool GustWarning => !Gusting && UntilGust <= WarningDuration;
         private StormGame game;
         private ParticleSystem rain;
         private ParticleSystemRenderer rainRenderer;
@@ -28,7 +35,12 @@ namespace StormSurvival
         {
             if (game == null || !game.Running) return;
             Intensity = Mathf.Clamp01(.15f + game.Elapsed / 500f * .55f + Mathf.Clamp01(game.Player.transform.position.z / 260f) * .30f);
-            rain.transform.position = game.Player.transform.position + Vector3.up * 9f;
+            Vector3 position = game.Player.transform.position;
+            bool nearRidge = position.z >= 176f && position.z <= 238f;
+            float windCue = Gusting ? 1f : Mathf.Clamp01(1f - UntilGust / WarningDuration);
+            game.World.SwayRidgeTrees(nearRidge ? .12f + windCue * .88f : 0f);
+            game.Audio.SetRidgeWind(nearRidge ? windCue * (game.Sheltered ? .35f : 1f) : 0f);
+            rain.transform.position = position + Vector3.up * 9f;
             rainRenderer.enabled = !game.Sheltered;
             var emission = rain.emission; emission.rateOverTime = Mathf.Lerp(500,1600,Intensity);
             RenderSettings.fogDensity = Mathf.Lerp(.010f,.017f,Intensity);

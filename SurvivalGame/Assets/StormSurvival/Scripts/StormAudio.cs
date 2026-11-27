@@ -6,6 +6,8 @@ namespace StormSurvival
     public sealed class StormAudio : MonoBehaviour
     {
         private StormGame game;
+        private AudioSource ridgeWind;
+        private float ridgeWindMix;
         private readonly Dictionary<string,AudioClip> clips = new Dictionary<string,AudioClip>();
         public void Initialize(StormGame owner)
         {
@@ -18,6 +20,9 @@ namespace StormSurvival
             Add("water",.75f,120,.85f,.6f);Add("fire",.65f,150,.8f,.4f);
             Add("craft",.55f,480,.15f,.5f);Add("checkpoint",.7f,650,.01f,.5f);
             Add("thunder",2f,40,.5f,.7f);Add("failure",1f,65,.2f,.6f);Add("success",2f,440,.01f,.65f);
+            Add("sled release", .48f, 135f, .82f, .72f);
+            Add("spotlight turn", .38f, 185f, .46f, .55f);
+            Add("signal reply", 1.15f, 705f, .06f, .62f);
             var random=new System.Random(526);const int rate=22050;var values=new float[rate*8];float smooth=0;
             for(int i=0;i<values.Length;i++)
             {
@@ -27,6 +32,12 @@ namespace StormSurvival
             }
             var ambient=AudioClip.Create("Original wind and rain",values.Length,1,rate,false);ambient.SetData(values,0);clips["ambience"]=ambient;
             var source=gameObject.AddComponent<AudioSource>();source.clip=ambient;source.volume=.75f;source.loop=true;source.Play();
+            ridgeWind = gameObject.AddComponent<AudioSource>();
+            ridgeWind.clip = ambient;
+            ridgeWind.loop = true;
+            ridgeWind.pitch = 1.35f;
+            ridgeWind.volume = 0f;
+            ridgeWind.Play();
             if(game.templateMusic!=null){var music=gameObject.AddComponent<AudioSource>();music.clip=game.templateMusic;music.volume=.075f;music.loop=true;music.Play();}
         }
         private void Add(string name,float duration,float frequency,float noise,float volume)
@@ -38,6 +49,12 @@ namespace StormSurvival
                 float tone=Mathf.Sin(t*Mathf.PI*2*frequency);
                 if(name=="success")tone=(tone+Mathf.Sin(t*Mathf.PI*2*frequency*1.25f)+Mathf.Sin(t*Mathf.PI*2*frequency*1.5f))/3;
                 if(name=="checkpoint")tone=Mathf.Sin(t*Mathf.PI*2*frequency*(t>.25f?1.5f:1));
+                if (name == "signal reply")
+                {
+                    float beat = t < .28f ? t : t - .28f;
+                    tone = Mathf.Sin(beat * Mathf.PI * 2f * frequency * (t < .28f ? 1f : 1.5f)) *
+                        Mathf.Clamp01(beat * 75f) * Mathf.Exp(-7f * beat);
+                }
                 data[i]=(tone*(1-noise)+((float)random.NextDouble()*2-1)*noise)*fade*volume;
             }
             var clip=AudioClip.Create("Storm / "+name,data.Length,1,rate,false);clip.SetData(data,0);clips[name]=clip;
@@ -111,7 +128,18 @@ namespace StormSurvival
             source.Play();
             Destroy(sound, clip.length + .1f);
         }
-        private void Update(){if(game!=null)AudioListener.volume=game.volume;}
+        public void SetRidgeWind(float strength)
+        {
+            ridgeWindMix = Mathf.Clamp01(strength);
+        }
+
+        private void Update()
+        {
+            if (game == null) return;
+            AudioListener.volume = game.volume;
+            float mix = game.Running ? ridgeWindMix : 0f;
+            ridgeWind.volume = Mathf.MoveTowards(ridgeWind.volume, mix * .93f, Time.unscaledDeltaTime * 1.65f);
+        }
         private void OnDestroy(){foreach(var clip in clips.Values)if(clip!=null)Destroy(clip);AudioListener.volume=1f;}
     }
 }

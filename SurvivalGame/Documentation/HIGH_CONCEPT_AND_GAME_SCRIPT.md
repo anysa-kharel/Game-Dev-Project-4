@@ -9,11 +9,11 @@ Single-player first-person survival/adventure. Intended audience: players comfor
 ## Game script
 
 1. **Trailhead / learn preparation.** Start with an animated pickaxe, an empty fuel cup, and cloth. Amber wraps mark timber and rock. Mining grants stone; timber grants wood. A nearby fire ring teaches material costs, warmth, drying, and checkpoints. Craft a torch and light it at the fire. Eat and drink from the template supplies.
-2. **Logging route / practice movement.** A low branch introduces jumping; an overhead trunk introduces crouching. A logging shelter contains food, water, cloth, a lantern, and barrel fuel. Learn to fill the cup and refill the lantern.
+2. **Logging route / practice movement.** A low branch introduces jumping and a stone crawlspace teaches crouching. A logging shelter contains food, water, cloth, a lantern, and barrel fuel. Learn to fill the cup and refill the lantern. An optional supply sled can be pulled toward the trail to free firewood and a spare torch wrap.
 3. **River / apply the tool differently.** The pickaxe now clears rubble rather than only collecting a resource. A falling trunk forms a crossing. Jump a branch on the narrow bridge while maintaining position. A fall costs warmth/health and sends the player ashore.
 4. **Far bank / plan ahead.** Build another fire, rest, replenish needs, and carry wood toward the lookout. The same campfire action now supports recovery after a hazardous crossing.
-5. **Ridge / apply crouching differently.** Gusts periodically slow and push the player. Crouching braces against the push; windbreaks create safe stops. Torch fuel and warmth turn movement into a pacing decision.
-6. **Lookout / combine systems.** Fill the cup from the final barrel, refill the generator, start it, and see the connected spotlight respond. The fuel action taught on a lantern now supplies rescue infrastructure. Ignite the beacon with six wood, a burning torch, and generator power. A short rescue transition leads to a results screen.
+5. **Ridge / apply crouching differently.** Gusts slow the player and push them sideways. Rising wind and swaying trees warn of the next gust. Players can time a run across the exposed shortcut and crouch to brace, or follow a longer covered route with food and water. Both routes lead to the lookout.
+6. **Lookout / combine systems.** Fill the cup from the final barrel, refill the generator, and start it. Use the powered spotlight to find the clearing marked by three amber lamps. The clearing flashes back and a reply sounds. Ignite the beacon with six wood, a burning torch, and generator power. A short rescue transition leads to a results screen.
 
 ## Rules, states, and feedback
 

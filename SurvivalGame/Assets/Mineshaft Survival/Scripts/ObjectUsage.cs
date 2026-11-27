@@ -69,6 +69,7 @@ public class ObjectUsage : MonoBehaviour
     public string CurrentPrompt { get; private set; }
     public float HoldProgress { get; private set; }
     private StormInteractable holding;
+    private StormSupplySled heldSled;
     private Component pendingHarvest;
     private float harvestContactAt;
     private float nextSwing;
@@ -88,6 +89,19 @@ public class ObjectUsage : MonoBehaviour
         HidePanels();
         CurrentPrompt = string.Empty;
 
+        bool grabHeld = Input.GetMouseButton(1);
+        if (!grabHeld) ReleaseGrab();
+        else if (heldSled != null)
+        {
+            if (heldSled.Pull(transform.position))
+            {
+                CurrentPrompt = heldSled.Prompt;
+                CancelHold();
+                return;
+            }
+            ReleaseGrab();
+        }
+
         var view = PlayerCam.transform;
         var target = FindTarget(new Ray(view.position, view.forward), out var contact, out var directHit);
         ApplyHarvestContact(target, contact);
@@ -98,7 +112,27 @@ public class ObjectUsage : MonoBehaviour
             ApplyHarvestContact(target, contact);
         }
 
-        if (!Input.GetMouseButton(1)) ReleaseGrab();
+        if (target is StormSupplySled sled)
+        {
+            CancelHold();
+            if (grabHeld && sled.BeginPull(transform.position))
+            {
+                ReleaseGrab();
+                heldSled = sled;
+            }
+            if (Input.GetKeyDown(KeyCode.E)) sled.Use();
+            CurrentPrompt = sled.CanTarget ? sled.Prompt : string.Empty;
+            return;
+        }
+
+        if (target is StormSearchlight searchlight)
+        {
+            CancelHold();
+            if (Input.GetKeyDown(KeyCode.E)) searchlight.Rotate();
+            CurrentPrompt = searchlight.Prompt;
+            return;
+        }
+
         if (target is StormInteractable adventure)
         {
             if (!adventure.Available) { CancelHold(); return; }
@@ -276,6 +310,11 @@ public class ObjectUsage : MonoBehaviour
         if (mine != null) return distance <= HarvestReach && mine.CanMine ? mine : null;
         if (distance > UseReach) return null;
 
+        var sled = collider.GetComponentInParent<StormSupplySled>();
+        if (sled != null) return sled.CanTarget ? sled : null;
+        var searchlight = collider.GetComponentInParent<StormSearchlight>();
+        if (searchlight != null) return searchlight;
+
         var food = collider.GetComponentInParent<Eatable>();
         if (food != null && food.FoodAmount > 1) return food;
         return (Component)collider.GetComponentInParent<WaterDrinkable>()
@@ -288,7 +327,13 @@ public class ObjectUsage : MonoBehaviour
     private void Tell(string message) { if (StormGame.Instance != null) StormGame.Instance.Toast(message, 5f); }
     public void CancelInteraction() { CurrentPrompt = string.Empty; pendingHarvest = null; CancelHold(); }
     private void CancelHold() { holding = null; HoldProgress = 0f; }
-    public void ReleaseGrab() { if (joint != null) { joint.spring = 0f; joint.connectedBody = null; } grabbing = false; }
+    public void ReleaseGrab()
+    {
+        if (heldSled != null) heldSled.EndPull();
+        heldSled = null;
+        if (joint != null) { joint.spring = 0f; joint.connectedBody = null; }
+        grabbing = false;
+    }
     private void Show(GameObject panel) { if (panel != null) panel.SetActive(true); }
     private void Value(Slider slider, float value, float maximum) { if (slider != null) { slider.maxValue = maximum; slider.value = value; } }
     private void HidePanels()

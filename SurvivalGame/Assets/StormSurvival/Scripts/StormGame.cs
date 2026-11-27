@@ -49,11 +49,14 @@ namespace StormSurvival
                 if (!Needs.HasTorch) return "Press Tab to craft a torch: 2 wood + 1 cloth.";
                 if (!Needs.TorchLit) return "Light your torch at a burning campfire. Rewrap it if its fuel is empty.";
                 if (!Needs.BridgeBuilt) return "Follow the trail through the logging camp. Mine the marked bridge obstruction at the river.";
-                if (Player != null && Player.transform.position.z < 178f) return "Cross the trunk bridge. Warm up at the far-bank camp.";
-                if (Player != null && Player.transform.position.z < 236f) return "Reach the lookout. Use the windbreaks when a gust rises.";
+                if (Player != null && Player.transform.position.z < 176f) return "Cross the trunk bridge. Warm up at the far-bank camp.";
+                if (Player != null && Player.transform.position.z < 236f)
+                    return "Reach the lookout. Take cover or cross the exposed shortcut during a lull.";
                 if (RescueGenerator == null || RescueGenerator.CurrentFuel <= 0f) return "Take fuel from the barrel with 2 then E. Refill the lookout generator with R.";
                 if (!RescueGenerator.Toggled) return "Press E at the refilled generator to power the lookout.";
-                return "Light the rescue beacon: 6 wood + a burning torch + generator power.";
+                if (World.Searchlight != null && !World.Searchlight.Aligned)
+                    return "Use E at the spotlight to aim at the clearing marked by three amber lamps.";
+                return "Light the rescue beacon with 6 wood and a burning torch.";
             }
         }
 
@@ -65,8 +68,14 @@ namespace StormSurvival
                 if (!Needs.FirstFire || !Needs.HasTorch) return new Vector3(-5, 0, 24);
                 if (!Needs.TorchLit) return World.NearestFire(Player.transform.position).transform.position;
                 if (!Needs.BridgeBuilt) return new Vector3(2, 0, 125);
-                if (Player.transform.position.z > 236f && RescueGenerator != null && (!RescueGenerator.Toggled || RescueGenerator.CurrentFuel <= 0)) return RescueGenerator.transform.position;
-                return new Vector3(0, 18, 258);
+                if (Player.transform.position.z >= 236f)
+                {
+                    if (RescueGenerator != null && (!RescueGenerator.Toggled || RescueGenerator.CurrentFuel <= 0f))
+                        return RescueGenerator.transform.position;
+                    if (World.Searchlight != null && !World.Searchlight.Aligned)
+                        return World.Searchlight.transform.position;
+                }
+                return new Vector3(0f, StormWorld.Height(258f), 258f);
             }
         }
 

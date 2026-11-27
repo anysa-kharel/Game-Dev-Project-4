@@ -17,12 +17,12 @@ Editor runtime status: **not run in this environment**. Record results locally.
 - Tab pauses. Craft torch for 2 wood + 1 cloth, return, light it at fire, select 1. Torch flames/light match fuel. Select 3 and confirm stowed torch conserves fuel.
 - Eat and drink with E. Meter effects occur once; water remains beside its supply station.
 - Select 2; E at barrel fills cup; R at lantern consumes one cup unit and refills it.
-- Jump the training branch, crouch under trunk. Check no head clipping when attempting to stand under a trunk.
+- Jump the training branch and crouch through the stone crawlspace. Check head clearance when releasing crouch inside. Approach the optional sled, hold right mouse and step toward the trail, then collect the bundle with E. Verify the bundle pays out once.
 - Mine river rubble: gain stone, see bridge appear. Jump bridge branch. Fall intentionally: shore recovery, wetness and health cost.
 - Rest at far-bank camp and retry after freezing. Checkpoint keeps materials and bridge; needs/recovery supplies restore.
-- Cross ridge: gust cue, sideways push, crouch reduction, roofed shelter protection.
-- Refill final generator with 2 + R, E starts it; linked spotlight responds. Empty/stopped generator prevents rescue.
-- Beacon rejects insufficient wood/unlit torch/no power without consuming wood. With all conditions met, consumes six wood and reaches win screen.
+- Try both ridge routes. Verify the gust warning, sideways push, crouch reduction, and roofed shelter protection. Note whether first-time players see the fork and understand the tradeoff.
+- Refill the final generator with 2 + R and start it with E. Turn the powered spotlight until the clearing marked with three amber lamps signals back. Verify that the beam turns and the flash and sound confirm alignment.
+- Beacon rejects insufficient wood, an unlit torch, missing power, or incomplete alignment without consuming wood. With all conditions met, it consumes six wood and reaches the win screen.
 - Pause, craft, focus loss, retry and restart work; timers stop during pause. Release a grabbed prop on pause.
 - Validate Running Level succeeds early in a run. Finish a Windows, Mac, and Linux build and test each required release on its target platform.
 
@@ -30,7 +30,8 @@ Editor runtime status: **not run in this environment**. Record results locally.
 
 - Tester/date/build commit:
 - Prior first-person game experience:
-- Completion time/retries:
+- Completion time from Begin Survival to rescue, including crafting/retries:
+- Ridge route chosen and time spent at camp, ridge, and lookout:
 - Which objective or control was unclear:
 - Observed searches/backtracking:
 - Warmth, thirst, movement and crossing difficulty:

@@ -21,7 +21,8 @@ namespace StormSurvival
         {
             get
             {
-                var s = StormGame.Instance.Needs;
+                var game = StormGame.Instance;
+                var s = game.Needs;
                 if (kind == Kind.Wood)
                     return !s.HasPickaxe ? "Select the pickaxe with 3" : "Left click  /  break down timber  " + strikes + "/3";
                 if (kind == Kind.Campfire)
@@ -31,7 +32,12 @@ namespace StormSurvival
                     if (fuel < 55f) return "Hold E  /  add fuel  [1 wood]";
                     return "Hold E  /  rest and save checkpoint";
                 }
-                if (kind == Kind.Beacon) return "Hold E  /  light beacon  [6 wood + lit torch + generator]";
+                if (kind == Kind.Beacon)
+                {
+                    if (game.World.Searchlight != null && !game.World.Searchlight.Aligned)
+                        return "Align the lookout spotlight before lighting the beacon";
+                    return "Hold E  /  light beacon  [6 wood + lit torch + power]";
+                }
                 if (kind == Kind.Cache) return "Hold E  /  take logging supplies";
                 return string.Empty;
             }
@@ -99,6 +105,11 @@ namespace StormSurvival
                     if (!s.BridgeBuilt) { game.Toast("Reach the lookout by opening the river crossing first."); break; }
                     if (!s.TorchLit) { game.Toast("Light your torch at a campfire first. Rewrap an empty torch in the crafting menu."); break; }
                     if (game.RescueGenerator == null || !game.RescueGenerator.Toggled || game.RescueGenerator.CurrentFuel <= 0) { game.Toast("Refill and start the lookout generator first. Use 2 + R to refill, then E to start it.", 7f); break; }
+                    if (game.World.Searchlight != null && !game.World.Searchlight.Aligned)
+                    {
+                        game.Toast("Rotate the powered spotlight toward the marked rescue clearing first.");
+                        break;
+                    }
                     if (!s.SpendWood(6)) { game.Toast("The beacon needs 6 wood. A marked woodpile is beside the lookout.", 6f); break; }
                     collected = true;
                     if (flame != null) flame.SetActive(true);

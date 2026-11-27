@@ -12,7 +12,7 @@ The supplied project had old built-in rendering settings alongside newer URP ass
 
 ## Goal
 
-Gather wood and mine stone. Prepare a campfire and torch, clear the river crossing, survive the exposed ridge, then refill and start the lookout generator. Ignite the rescue beacon with **6 wood, a burning torch, and generator power**.
+Gather wood and mine stone. Prepare a campfire and torch, clear the river crossing, and choose a route over the ridge. Start the lookout generator and aim the spotlight at the clearing marked by three amber lamps. Once the clearing signals back, light the beacon with **6 wood, a burning torch, and generator power**.
 
 | Control | Action |
 |---|---|
@@ -23,9 +23,9 @@ Gather wood and mine stone. Prepare a campfire and torch, clear the river crossi
 | 1 / 2 / 3 | Torch / fuel cup / pickaxe |
 | Left click | Swing the held tool; pickaxe mines rocks and timber |
 | Hold E | Campfire, supply crate, beacon |
-| E | Eat, drink, collect barrel fuel, toggle generator/lantern |
+| E | Eat, drink, collect supplies or barrel fuel, toggle equipment, turn the rescue spotlight |
 | R with fuel cup | Refill generator or lantern |
-| Right mouse | Hold a movable prop when within reach |
+| Right mouse | Hold a movable prop or grab the optional supply sled. Step toward the trail to pull the sled free. |
 | Tab | Craft or rewrap torch; pauses play |
 | Esc | Pause / resume |
 
@@ -36,7 +36,8 @@ Gather wood and mine stone. Prepare a campfire and torch, clear the river crossi
 - Timber takes three pickaxe swings and gives four wood; it renews after 65 seconds. Amber-marked rocks give four stone. Mining the marked river rubble releases the bridge.
 - Food and water are the actual template supplies. Their hunger/thirst effects are shown in the HUD. Use the template fuel cup to take oil from barrels and refill the generator.
 - Shelter reduces exposure; fires restore warmth faster. Water immersion costs health and warmth and returns you to shore.
-- The ridge has periodic gusts. Roofed windbreaks block exposure; crouching reduces sideways push.
+- The ridge splits into an exposed shortcut and a longer covered path with a food and water stop. Rising wind audio and swaying trees warn that a gust is coming. Crouching reduces sideways push.
+- The optional logging-camp sled gives two wood and up to 60 seconds of torch fuel. If there is no room for a wrap, it gives one cloth instead.
 - Failure returns you to your last campfire with recovery supplies. Inventory and opened routes remain. Checkpoints last for the current session; restarting the adventure starts fresh.
 
 ## What's reused
