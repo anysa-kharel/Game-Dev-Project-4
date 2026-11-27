@@ -23,6 +23,9 @@ namespace StormSurvival
             Add("sled release", .48f, 135f, .82f, .72f);
             Add("spotlight turn", .38f, 185f, .46f, .55f);
             Add("signal reply", 1.15f, 705f, .06f, .62f);
+            AddWolfSound("wolf warning", 1.45f, 380f, .17f);
+            AddWolfSound("wolf bite", .25f, 110f, .62f);
+            AddWolfSound("wolf stagger", .48f, 165f, .34f);
             var random=new System.Random(526);const int rate=22050;var values=new float[rate*8];float smooth=0;
             for(int i=0;i<values.Length;i++)
             {
@@ -59,6 +62,29 @@ namespace StormSurvival
             }
             var clip=AudioClip.Create("Storm / "+name,data.Length,1,rate,false);clip.SetData(data,0);clips[name]=clip;
         }
+        private void AddWolfSound(string name, float seconds, float frequency, float grit)
+        {
+            const int sampleRate = 22050;
+            var samples = new float[Mathf.CeilToInt(sampleRate * seconds)];
+            var random = new System.Random((int)frequency);
+            float phase = 0f;
+            float breath = 0f;
+            for (int i = 0; i < samples.Length; i++)
+            {
+                float t = (float)i / samples.Length;
+                float pitch = frequency * (.87f + .36f * Mathf.Sin(t * Mathf.PI));
+                phase += pitch * (2f * Mathf.PI / sampleRate);
+                breath = Mathf.Lerp(breath, (float)random.NextDouble() * 2f - 1f, .24f);
+                float rasp = Mathf.Sin(phase) + .25f * Mathf.Sin(phase * 2f) + .13f * Mathf.Sin(phase * 3f);
+                float envelope = Mathf.Clamp01(t * 14f) * Mathf.Pow(1f - t, .8f);
+                samples[i] = (rasp * (.46f - grit * .36f) + breath * grit) * envelope;
+            }
+
+            var clip = AudioClip.Create("Storm / " + name, samples.Length, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            clips[name] = clip;
+        }
+
         private void AddHarvestSound(string name, HarvestSurface surface, bool breaks)
         {
             bool wood = surface == HarvestSurface.Wood;
@@ -109,7 +135,8 @@ namespace StormSurvival
 
         public void Play(string name, Vector3 position, float volume)
         {
-            PlayClip(name, position, volume, 0f);
+            float spatialBlend = name.StartsWith("wolf ", System.StringComparison.Ordinal) ? .78f : 0f;
+            PlayClip(name, position, volume, spatialBlend);
         }
 
         private void PlayClip(string name, Vector3 position, float volume, float spatialBlend)

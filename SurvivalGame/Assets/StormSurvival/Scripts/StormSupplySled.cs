@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace StormSurvival
 {
@@ -48,6 +49,12 @@ namespace StormSurvival
                 sled.body = frame.AddComponent<Rigidbody>();
                 sled.body.useGravity = false;
                 sled.body.isKinematic = true;
+                var obstacle = frame.AddComponent<NavMeshObstacle>();
+                obstacle.shape = NavMeshObstacleShape.Box;
+                obstacle.center = collider.center;
+                obstacle.size = collider.size;
+                obstacle.carving = true;
+                obstacle.carveOnlyStationary = false;
             }
             return sled;
         }

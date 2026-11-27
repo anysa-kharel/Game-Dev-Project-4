@@ -4,16 +4,16 @@ namespace StormSurvival
 {
     public sealed class StormWeather : MonoBehaviour
     {
-        private const float GustPeriod = 15f;
-        private const float GustStart = 10f;
-        private const float GustEnd = 14f;
         private const float WarningDuration = 2.6f;
+        private StormGustSchedule gusts;
+        private bool ridgeWeatherStarted;
 
         public float Intensity { get; private set; } = 0.15f;
-        private float GustPhase => game != null ? game.Elapsed % GustPeriod : 0f;
-        public bool Gusting => GustPhase >= GustStart && GustPhase < GustEnd;
-        public float UntilGust => GustPhase < GustEnd ? Mathf.Max(0f, GustStart - GustPhase) : GustPeriod + GustStart - GustPhase;
+        public bool Gusting => gusts != null && gusts.Gusting;
+        public float UntilGust => gusts != null ? gusts.UntilGust : float.PositiveInfinity;
         public bool GustWarning => !Gusting && UntilGust <= WarningDuration;
+        public float GustStrength => gusts != null ? gusts.Strength : 0f;
+        public int WindDirection => gusts != null ? gusts.Direction : 1;
         private StormGame game;
         private ParticleSystem rain;
         private ParticleSystemRenderer rainRenderer;
@@ -22,6 +22,7 @@ namespace StormSurvival
         public void Initialize(StormGame owner)
         {
             game = owner;
+            gusts = new StormGustSchedule(owner.RunLayout.WindSeed);
             var obj = new GameObject("Rain around the survivor"); obj.transform.rotation = Quaternion.Euler(90,0,0);
             rain = obj.AddComponent<ParticleSystem>();
             var main = rain.main; main.startLifetime = 1.2f; main.startSpeed = 15f; main.startSize = 0.035f;
@@ -37,8 +38,10 @@ namespace StormSurvival
             Intensity = Mathf.Clamp01(.15f + game.Elapsed / 500f * .55f + Mathf.Clamp01(game.Player.transform.position.z / 260f) * .30f);
             Vector3 position = game.Player.transform.position;
             bool nearRidge = position.z >= 176f && position.z <= 238f;
-            float windCue = Gusting ? 1f : Mathf.Clamp01(1f - UntilGust / WarningDuration);
-            game.World.SwayRidgeTrees(nearRidge ? .12f + windCue * .88f : 0f);
+            if (nearRidge) ridgeWeatherStarted = true;
+            if (ridgeWeatherStarted) gusts.Advance(Time.deltaTime);
+            float windCue = Gusting ? Mathf.Clamp01(GustStrength) : Mathf.Clamp01(1f - UntilGust / WarningDuration);
+            game.World.SwayRidgeTrees(nearRidge ? .12f + windCue * .88f : 0f, WindDirection);
             game.Audio.SetRidgeWind(nearRidge ? windCue * (game.Sheltered ? .35f : 1f) : 0f);
             rain.transform.position = position + Vector3.up * 9f;
             rainRenderer.enabled = !game.Sheltered;

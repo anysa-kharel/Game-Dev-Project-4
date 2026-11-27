@@ -18,6 +18,7 @@ namespace StormSurvival
         [Range(0f, 1f)] public float volume = 0.65f;
         public static StormGame Instance { get; private set; }
         public SurvivalState Needs { get; private set; } = new SurvivalState();
+        public StormRunLayout RunLayout { get; private set; }
         public StormMode Mode { get; private set; } = StormMode.Title;
         public bool Running => Mode == StormMode.Playing;
         public StormWorld World { get; private set; }
@@ -29,6 +30,7 @@ namespace StormSurvival
         public int Retries { get; private set; }
         public int WoodGathered { get; private set; }
         public string Notice { get; private set; }
+        public string FailureReason { get; private set; }
         public float NoticeUntil { get; private set; }
         public string CheckpointName { get; private set; } = "Forest trailhead";
         public bool Sheltered { get; private set; }
@@ -36,6 +38,7 @@ namespace StormSurvival
         private Vector3 checkpoint = new Vector3(0, 0.2f, 3);
         private StormInteractable checkpointFire;
         private float waterCooldown;
+        private static StormRunLayout previousLayout;
 
         public string Objective
         {
@@ -82,6 +85,7 @@ namespace StormSurvival
         private void Awake()
         {
             Instance = this; TemplatePrefs.Enabled = false;
+            RunLayout = CreateRunLayout();
             Needs.HasPickaxe = true; Needs.Cloth = 1;
             Time.timeScale = 1f; Application.targetFrameRate = 90;
             Audio = gameObject.AddComponent<StormAudio>(); Audio.Initialize(this);
@@ -90,6 +94,22 @@ namespace StormSurvival
             Weather = gameObject.AddComponent<StormWeather>(); Weather.Initialize(this);
             UI = gameObject.AddComponent<StormUI>(); UI.Build(this);
             SetMode(StormMode.Title);
+        }
+
+        private static StormRunLayout CreateRunLayout()
+        {
+            StormRunLayout next;
+            do
+            {
+                next = new StormRunLayout(Random.Range(1, int.MaxValue));
+            }
+            while (previousLayout != null &&
+                next.SledSite == previousLayout.SledSite &&
+                next.StashFoodSite == previousLayout.StashFoodSite &&
+                next.SpareFuelSite == previousLayout.SpareFuelSite);
+
+            previousLayout = next;
+            return next;
         }
 
         private void Update()
@@ -126,7 +146,25 @@ namespace StormSurvival
             }
             if (position.y < -12f) Needs.Damage(100f);
             Player.Stats.Health = Needs.Health * 10f;
-            if (!Needs.Alive) { Audio.Play("failure", position, 0.7f); SetMode(StormMode.Failed); }
+            if (!Needs.Alive) Fail();
+        }
+
+        internal void FailFromWolf()
+        {
+            if (!Running || Needs.Rescued) return;
+
+            Needs.Damage(100f);
+            Player.Stats.Health = 0f;
+            Player.Shake(.24f);
+            Audio.Play("wolf bite", Player.transform.position, .8f);
+            Fail("The wolf caught you.");
+        }
+
+        private void Fail(string reason = null)
+        {
+            FailureReason = reason;
+            Audio.Play("failure", Player.transform.position, .7f);
+            SetMode(StormMode.Failed);
         }
 
         public void Begin() { SetMode(StormMode.Playing); Toast("Follow the amber trail markers.", 5f); }
@@ -159,10 +197,11 @@ namespace StormSurvival
         }
         public void Retry()
         {
-            Retries++; Needs.Recover(); Player.Stats.Health = 1000;
+            Retries++; FailureReason = null; Needs.Recover(); Player.Stats.Health = 1000;
             Player.Stats.Hunger = Mathf.Max(600, Player.Stats.Hunger); Player.Stats.Thirst = Mathf.Max(800, Player.Stats.Thirst);
             if (checkpointFire != null) checkpointFire.fuel = Mathf.Max(checkpointFire.fuel, 100f);
             Player.Teleport(checkpoint); Player.ResetMotion();
+            foreach (var wolf in World.Wolves) wolf.ResetEncounter();
             SetMode(StormMode.Playing);
             Toast("Restored at " + CheckpointName + ". Supplies and opened routes retained.", 6f);
         }

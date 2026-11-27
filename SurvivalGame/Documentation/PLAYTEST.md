@@ -26,12 +26,19 @@ Editor runtime status: **not run in this environment**. Record results locally.
 - Pause, craft, focus loss, retry and restart work; timers stop during pause. Release a grabbed prop on pause.
 - Validate Running Level succeeds early in a run. Finish a Windows, Mac, and Linux build and test each required release on its target platform.
 
+## Replay variation
+
+- Start two adventures. Check which sled, supply stash, spare fuel, and wolf locations changed. Verify that the early supplies and lookout fuel remain accessible.
+- Retry from a checkpoint and confirm that optional supply locations and the weather pattern stay consistent. Look for the gust warning before the next push.
+- Follow the trail past the first wolf on the logging route, then look for separate wolves beyond the far-bank camp and on the upper ridge. Check that getting past one wolf leaves the later encounters available. Test the lunge warning, lethal bite, torch, and pickaxe. Confirm that retry returns all three wolves to their patrols.
+
 ## Human playtest record (copy for each participant/build)
 
 - Tester/date/build commit:
 - Prior first-person game experience:
 - Completion time from Begin Survival to rescue, including crafting/retries:
 - Ridge route chosen and time spent at camp, ridge, and lookout:
+- Choices that changed between runs and what prompted them:
 - Which objective or control was unclear:
 - Observed searches/backtracking:
 - Warmth, thirst, movement and crossing difficulty:

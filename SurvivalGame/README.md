@@ -36,9 +36,10 @@ Gather wood and mine stone. Prepare a campfire and torch, clear the river crossi
 - Timber takes three pickaxe swings and gives four wood; it renews after 65 seconds. Amber-marked rocks give four stone. Mining the marked river rubble releases the bridge.
 - Food and water are the actual template supplies. Their hunger/thirst effects are shown in the HUD. Use the template fuel cup to take oil from barrels and refill the generator.
 - Shelter reduces exposure; fires restore warmth faster. Water immersion costs health and warmth and returns you to shore.
-- The ridge splits into an exposed shortcut and a longer covered path with a food and water stop. Rising wind audio and swaying trees warn that a gust is coming. Crouching reduces sideways push.
-- The optional logging-camp sled gives two wood and up to 60 seconds of torch fuel. If there is no room for a wrap, it gives one cloth instead.
-- Failure returns you to your last campfire with recovery supplies. Inventory and opened routes remain. Checkpoints last for the current session; restarting the adventure starts fresh.
+- The ridge splits into an exposed shortcut and a longer covered path with a food and water stop. Each adventure has different gust timing and strength. Rising wind and swaying trees warn of gusts, and crouching reduces their sideways push.
+- The sled, an optional food and water stash, and a spare fuel barrel move between marked sites when you start a new adventure. The sled gives two wood and up to 60 seconds of torch fuel, or one cloth if a wrap would go unused.
+- Three wolves patrol the logging trail, the woods beyond the far-bank camp, and the upper ridge in separate territories. Each can chase an exposed player, and a landed bite ends the run. Watch for the growl and lunge warning. Keep your distance while crouched, face it with an equipped lit torch, or fend it off with the pickaxe.
+- Failure returns you to your last campfire with recovery supplies. A checkpoint retry keeps the same supply locations and weather pattern. Starting a new adventure rolls a fresh setup.
 
 ## What's reused
 

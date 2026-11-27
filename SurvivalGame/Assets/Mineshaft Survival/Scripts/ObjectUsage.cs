@@ -112,6 +112,14 @@ public class ObjectUsage : MonoBehaviour
             ApplyHarvestContact(target, contact);
         }
 
+        if (target is StormWolf wolf)
+        {
+            CancelHold();
+            if (wolf.CanTarget)
+                CurrentPrompt = inventory.selected == 2 ? "Left click / ward off wolf" : wolf.Prompt;
+            return;
+        }
+
         if (target is StormSupplySled sled)
         {
             CancelHold();
@@ -240,7 +248,7 @@ public class ObjectUsage : MonoBehaviour
             else punchAnim.SetTrigger(pickaxe ? "PunchPick" : "PunchTorch");
         }
 
-        if (pickaxe && (target is Mineable || target is StormInteractable { IsChoppable: true }))
+        if (pickaxe && (target is Mineable || target is StormWolf || target is StormInteractable { IsChoppable: true }))
         {
             pendingHarvest = target;
             harvestContactAt = Time.time + (animated ? PickaxeContactTime : 0f);
@@ -257,6 +265,7 @@ public class ObjectUsage : MonoBehaviour
 
         if (receiver is Mineable rock) rock.Strike(50f, contact.point, contact.normal);
         else if (receiver is StormInteractable wood) wood.Chop(contact.point, contact.normal);
+        else if (receiver is StormWolf wolf) wolf.Strike(contact.point);
     }
 
     private Component FindTarget(Ray ray, out RaycastHit contact, out RaycastHit directHit)
@@ -310,6 +319,8 @@ public class ObjectUsage : MonoBehaviour
         if (mine != null) return distance <= HarvestReach && mine.CanMine ? mine : null;
         if (distance > UseReach) return null;
 
+        var wolf = collider.GetComponentInParent<StormWolf>();
+        if (wolf != null) return wolf.CanTarget ? wolf : null;
         var sled = collider.GetComponentInParent<StormSupplySled>();
         if (sled != null) return sled.CanTarget ? sled : null;
         var searchlight = collider.GetComponentInParent<StormSearchlight>();

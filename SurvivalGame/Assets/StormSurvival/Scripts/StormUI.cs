@@ -261,7 +261,10 @@ namespace StormSurvival
                     break;
                 case StormMode.Failed:
                     menuTitle.text = "Back to camp";
-                    menuSummary.text = "Return to " + game.CheckpointName + " with your supplies and opened routes.\nFire restores warmth, and shelter helps you dry.";
+                    string retryCopy = "Return to " + game.CheckpointName + " with your supplies and opened routes.";
+                    menuSummary.text = game.FailureReason != null
+                        ? game.FailureReason + "\n" + retryCopy
+                        : retryCopy + "\nFire restores warmth, and shelter helps you dry.";
                     primaryText.text = "Retry checkpoint";
                     break;
                 case StormMode.Won:

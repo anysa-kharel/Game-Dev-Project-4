@@ -240,8 +240,9 @@ namespace StormSurvival
             capsule.center = originalCenter - Vector3.up * (originalHeight - capsule.height) * 0.5f;
             float speed = Crouched ? 0.55f : 1f;
             bool gale = game.Weather.OnRidge(feet) && game.Weather.Gusting && !game.Sheltered;
-            Controller.MovementSpeedMultiplier = gale ? speed * 0.65f : speed;
-            Controller.ExternalVelocity = gale ? Vector3.right * (Crouched ? 0.12f : 1.0f) : Vector3.zero;
+            float gust = gale ? game.Weather.GustStrength : 0f;
+            Controller.MovementSpeedMultiplier = speed * (1f - .35f * gust);
+            Controller.ExternalVelocity = Vector3.right * (game.Weather.WindDirection * gust * (Crouched ? .12f : 1f));
         }
 
         private void LateUpdate()

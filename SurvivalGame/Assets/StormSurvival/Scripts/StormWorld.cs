@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.AI;
 
 namespace StormSurvival
 {
@@ -12,7 +13,9 @@ namespace StormSurvival
         public Material Amber { get; private set; }
         public Light Sun { get; private set; }
         public StormSearchlight Searchlight { get; private set; }
+        public IReadOnlyList<StormWolf> Wolves => wolves;
         private StormGame game;
+        private StormRunLayout runLayout;
         private Transform root, fallingTrunk;
         private GameObject bridge;
         private bool isPreview;
@@ -23,6 +26,36 @@ namespace StormSurvival
         private readonly List<(Transform Tree, Quaternion BaseRotation)> ridgeTrees = new List<(Transform, Quaternion)>();
         private readonly List<StormInteractable> fires = new List<StormInteractable>();
 
+        private readonly List<StormWolf> wolves = new List<StormWolf>();
+        private readonly List<(NavMeshData Data, NavMeshDataInstance Instance)> wolfNavigation =
+            new List<(NavMeshData, NavMeshDataInstance)>();
+        private Mesh terrainMesh;
+
+        // Gaps between regions leave the bridge, far-bank camp, and lookout outside wolf territory.
+        private static readonly (string Name, Vector2 Span, (Vector2 Home, Vector2 Crossing)[] Sites)[] WolfTerritories =
+        {
+            ("Logging trail", new Vector2(59f, 127f), new[]
+            {
+                (new Vector2(-3.2f, 73.5f), new Vector2(2.75f, 75f)),
+                (new Vector2(3.2f, 101.5f), new Vector2(-2.65f, 103.3f)),
+                (new Vector2(-3.2f, 116.7f), new Vector2(2.65f, 118.4f))
+            }),
+            ("Far bank", new Vector2(159.5f, 184f), new[]
+            {
+                (new Vector2(3.25f, 169.5f), new Vector2(-2.6f, 171.5f)),
+                (new Vector2(-3.15f, 172.5f), new Vector2(2.55f, 174.5f)),
+                (new Vector2(3.25f, 175.5f), new Vector2(-2.55f, 177.4f))
+            }),
+            ("Ridge", new Vector2(197f, 232.5f), new[]
+            {
+                (new Vector2(3.45f, 205.5f), new Vector2(-4.55f, 208f)),
+                (new Vector2(3.5f, 215.7f), new Vector2(-4.2f, 218.3f)),
+                (new Vector2(3.2f, 224.4f), new Vector2(-5f, 227.2f))
+            })
+        };
+
+        internal const int WolfAgentType = 0;
+        internal const float WolfAreaHalfWidth = 29f;
         private const float ForestBoundaryX = 40f;
         private const float CrouchBarrierZ = 57f;
 
@@ -38,6 +71,7 @@ namespace StormSurvival
         {
             game = owner;
             isPreview = previewRoot != null;
+            runLayout = owner.RunLayout ?? new StormRunLayout(StormRunLayout.PreviewSeed);
             root = isPreview ? previewRoot : new GameObject("The Big Storm / Environment").transform;
             Wood = MakeMaterial(new Color(0.35f, 0.23f, 0.13f));
             if (game.woodTexture != null) Wood.SetTexture("_BaseMap", game.woodTexture);
@@ -60,7 +94,8 @@ namespace StormSurvival
             StormRidgeRoute.Build(this, root, shelters.Add, PlaceTemplateSupplies);
             Shelter(new Vector3(6, Height(238), 238), 8f, 7f);
             PlaceTemplateSupplies(new Vector3(-2,0,19));
-            PlaceTemplateSupplies(new Vector3(-7,0,85));
+            PlaceTemplateSupplies(runLayout.StashFoodSite, runLayout.StashWaterSite);
+            Marker(runLayout.StashMarkerSite);
             PlaceTemplateSupplies(new Vector3(5,0,153));
             PlaceTemplateSupplies(new Vector3(5,Height(239),239));
             PlaceMine(new Vector3(-4,0,16), false);
@@ -74,7 +109,89 @@ namespace StormSurvival
                 new Vector3(-6,0,169),new Vector3(5,0,190),new Vector3(-6,0,219),new Vector3(-6,0,245),new Vector3(5,0,254) }) WoodPile(p);
 
             for (int z = 10; z < 264; z += 14) if (z < 125 || z > 145) Marker(new Vector3(3f, Height(z), z));
+            PlaceSpareFuel();
+            if (!isPreview) BuildWolves();
             LightScene();
+        }
+
+        private void BuildWolves()
+        {
+            var sources = CollectWolfNavigationSources();
+            var settings = NavMesh.GetSettingsByID(WolfAgentType);
+            settings.agentRadius = .48f;
+            settings.agentHeight = 1.45f;
+            settings.agentClimb = .20f;
+
+            var random = new System.Random(runLayout.WolfSeed);
+            foreach (var territory in WolfTerritories)
+            {
+                int firstSite = random.Next(territory.Sites.Length);
+                int patrolSeed = random.Next();
+                var data = NavMeshBuilder.BuildNavMeshData(settings, sources, WolfNavigationBounds(territory.Span),
+                    Vector3.zero, Quaternion.identity);
+                var instance = data != null ? NavMesh.AddNavMeshData(data) : default;
+                if (!instance.valid)
+                {
+                    if (data != null) DestroyGeneratedAsset(data);
+                    Debug.LogError($"Could not build wolf navigation for {territory.Name}.");
+                    continue;
+                }
+                wolfNavigation.Add((data, instance));
+
+                StormWolf wolf = null;
+                for (int offset = 0; offset < territory.Sites.Length && wolf == null; offset++)
+                {
+                    var site = territory.Sites[(firstSite + offset) % territory.Sites.Length];
+                    wolf = StormWolf.Build(game, this, root, territory.Name, territory.Span, site, patrolSeed);
+                }
+                if (wolf != null) wolves.Add(wolf);
+                else Debug.LogError($"Could not place a wolf patrol for {territory.Name}.");
+            }
+        }
+
+        private static Bounds WolfNavigationBounds(Vector2 span)
+        {
+            float bottom = Height(span.x);
+            float top = Height(span.y);
+            return new Bounds(new Vector3(0f, (bottom + top) * .5f, (span.x + span.y) * .5f),
+                new Vector3(WolfAreaHalfWidth * 2f, top - bottom + 12f, span.y - span.x));
+        }
+
+        private List<NavMeshBuildSource> CollectWolfNavigationSources()
+        {
+            var bounds = WolfNavigationBounds(new Vector2(WolfTerritories[0].Span.x, WolfTerritories[^1].Span.y));
+            Physics.SyncTransforms();
+            var sources = new List<NavMeshBuildSource>();
+            NavMeshBuilder.CollectSources(root, Physics.DefaultRaycastLayers, NavMeshCollectGeometry.PhysicsColliders,
+                NavMesh.GetAreaFromName("Walkable"), new List<NavMeshBuildMarkup>(), sources);
+            int blocked = NavMesh.GetAreaFromName("Not Walkable");
+            for (int index = sources.Count - 1; index >= 0; index--)
+            {
+                var source = sources[index];
+                if (source.sourceObject == terrainMesh) continue;
+                if (source.component is Collider collider)
+                {
+                    if (!collider.enabled || collider.isTrigger || !bounds.Intersects(collider.bounds) ||
+                        collider.TryGetComponent<NavMeshObstacle>(out _))
+                    {
+                        sources.RemoveAt(index);
+                        continue;
+                    }
+
+                    // Imported collider meshes may lack CPU-readable vertices in player builds.
+                    if (source.sourceObject is Mesh mesh && !mesh.isReadable)
+                    {
+                        source.shape = NavMeshBuildSourceShape.Box;
+                        source.size = collider.bounds.size;
+                        source.transform = Matrix4x4.Translate(collider.bounds.center);
+                        source.sourceObject = null;
+                    }
+                }
+                source.area = blocked;
+                sources[index] = source;
+            }
+
+            return sources;
         }
 
         private void AddTrailLog(string label, Vector3 center, float width, float diameter)
@@ -184,8 +301,9 @@ namespace StormSurvival
             int at=0;
             for(int z=0;z<nz-1;z++)for(int x=0;x<nx-1;x++)
             { int a=z*nx+x,b=a+1,c=a+nx;indices[at++]=a;indices[at++]=c;indices[at++]=b;indices[at++]=b;indices[at++]=c;indices[at++]=c+1; }
-            var mesh = new Mesh { name="Forest ground and river banks",vertices=vertices,uv=uv,triangles=indices };mesh.RecalculateNormals();mesh.RecalculateBounds();ownedMeshes.Add(mesh);
-            var obj=Group("Forest terrain",Vector3.zero).gameObject;obj.AddComponent<MeshFilter>().sharedMesh=mesh;obj.AddComponent<MeshRenderer>().sharedMaterial=grass;obj.AddComponent<MeshCollider>().sharedMesh=mesh;
+            terrainMesh = new Mesh { name="Forest ground and river banks",vertices=vertices,uv=uv,triangles=indices };
+            terrainMesh.RecalculateNormals(); terrainMesh.RecalculateBounds(); ownedMeshes.Add(terrainMesh);
+            var obj=Group("Forest terrain",Vector3.zero).gameObject;obj.AddComponent<MeshFilter>().sharedMesh=terrainMesh;obj.AddComponent<MeshRenderer>().sharedMaterial=grass;obj.AddComponent<MeshCollider>().sharedMesh=terrainMesh;
             for(int z=-10;z<280;z+=4)
             {
                 if(z>126&&z<146)continue;
@@ -241,13 +359,13 @@ namespace StormSurvival
                 { var b=Instantiate(game.rocks[(z/23)%game.rocks.Length],new Vector3(x,Height(z),z),Quaternion.identity,root);b.transform.localScale*=2.2f; }
             }
         }
-        public void SwayRidgeTrees(float strength)
+        public void SwayRidgeTrees(float strength, int direction)
         {
             foreach (var (tree, rest) in ridgeTrees)
             {
                 float phase = Time.time * 3.2f + tree.position.z * .31f;
                 float bend = strength * (2.3f + 1.5f * Mathf.Sin(phase));
-                tree.localRotation = Quaternion.AngleAxis(-bend, Vector3.forward) * rest;
+                tree.localRotation = Quaternion.AngleAxis(-bend * direction, Vector3.forward) * rest;
             }
         }
 
@@ -275,7 +393,18 @@ namespace StormSurvival
             var crate = Shape("Cloth supply box",PrimitiveType.Cube,root,new Vector3(-7,.5f,89),new Vector3(1.2f,1,.8f),Wood);
             var cache = crate.AddComponent<StormInteractable>(); cache.kind = StormInteractable.Kind.Cache; cache.label = "Logging supplies";
             Marker(new Vector3(-7,0,88));
-            StormSupplySled.Build(game, this, root, new Vector3(5.1f, 0f, 79.5f), isPreview);
+            StormSupplySled.Build(game, this, root, runLayout.SledSite, isPreview);
+        }
+
+        private void PlaceSpareFuel()
+        {
+            var barrel = PlaceTemplate(game.fuelTemplate, runLayout.SpareFuelSite, 1.15f, Quaternion.identity);
+            if (barrel == null || !barrel.TryGetComponent<OilBarrel>(out var fuel)) return;
+
+            barrel.name = "Spare fuel barrel";
+            fuel.fuel = 2f;
+            fuel.MaxFuel = 2f;
+            Marker(runLayout.SpareFuelMarkerSite);
         }
 
         private GameObject PlaceTemplate(GameObject prefab, Vector3 position, float height, Quaternion rotation)
@@ -457,6 +586,14 @@ namespace StormSurvival
             else DestroyImmediate(asset);
         }
 
-        private void OnDestroy() => ReleaseGeneratedAssets();
+        private void OnDestroy()
+        {
+            foreach (var (data, instance) in wolfNavigation)
+            {
+                if (instance.valid) instance.Remove();
+                DestroyGeneratedAsset(data);
+            }
+            ReleaseGeneratedAssets();
+        }
     }
 }

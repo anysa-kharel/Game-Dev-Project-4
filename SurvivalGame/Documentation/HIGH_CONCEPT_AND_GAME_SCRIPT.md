@@ -9,10 +9,10 @@ Single-player first-person survival/adventure. Intended audience: players comfor
 ## Game script
 
 1. **Trailhead / learn preparation.** Start with an animated pickaxe, an empty fuel cup, and cloth. Amber wraps mark timber and rock. Mining grants stone; timber grants wood. A nearby fire ring teaches material costs, warmth, drying, and checkpoints. Craft a torch and light it at the fire. Eat and drink from the template supplies.
-2. **Logging route / practice movement.** A low branch introduces jumping and a stone crawlspace teaches crouching. A logging shelter contains food, water, cloth, a lantern, and barrel fuel. Learn to fill the cup and refill the lantern. An optional supply sled can be pulled toward the trail to free firewood and a spare torch wrap.
+2. **Logging route / practice movement.** A low branch introduces jumping and a stone crawlspace teaches crouching. Learn to fill the fuel cup and refill the lantern at the logging camp. A wolf crosses the main trail at one of three spots, then roams the surrounding woods. Standing players who come into view can be chased. A growl signals its lunge, and one bite ends the run. Crouch at a distance or use the torch to drive it away. Look for marked supplies and an optional sled that can be pulled free.
 3. **River / apply the tool differently.** The pickaxe now clears rubble rather than only collecting a resource. A falling trunk forms a crossing. Jump a branch on the narrow bridge while maintaining position. A fall costs warmth/health and sends the player ashore.
-4. **Far bank / plan ahead.** Build another fire, rest, replenish needs, and carry wood toward the lookout. The same campfire action now supports recovery after a hazardous crossing.
-5. **Ridge / apply crouching differently.** Gusts slow the player and push them sideways. Rising wind and swaying trees warn of the next gust. Players can time a run across the exposed shortcut and crouch to brace, or follow a longer covered route with food and water. Both routes lead to the lookout.
+4. **Far bank / plan ahead.** Build another fire, rest, replenish needs, and carry wood toward the lookout. A second wolf patrols the woods beyond the camp.
+5. **Ridge / apply crouching differently.** Gusts slow the player and push them sideways. Their timing and force change between adventures, with rising wind and swaying trees as warnings. Players can time the exposed shortcut or take the longer covered route with food and water. A third wolf patrols the upper ridge between the fork and the lookout camp.
 6. **Lookout / combine systems.** Fill the cup from the final barrel, refill the generator, and start it. Use the powered spotlight to find the clearing marked by three amber lamps. The clearing flashes back and a reply sounds. Ignite the beacon with six wood, a burning torch, and generator power. A short rescue transition leads to a results screen.
 
 ## Rules, states, and feedback
@@ -32,7 +32,7 @@ The HUD shows the objective direction/distance, inventory, six survival meters, 
 | Actions | Move, look, sprint, jump, crouch, mine, gather, craft, light, refill, toggle, rest, and signal rescue. |
 | Rules | Exact crafting costs, stamina costs, exposure rates, interaction distances, checkpoint recovery, and the combined rescue condition. |
 | Skill | Navigation, timing jumps, bracing during gusts, remembering tools, and planning resource use. |
-| Chance | Weather timing is predictable and repeatable; forest placement uses a fixed seed. Uncertainty comes mainly from a new player's route/resource knowledge rather than random instant failure. |
+| Chance | Each new adventure chooses a seeded layout for optional supplies, three wolf patrols, and gusts. Core materials and the route to rescue stay accessible. Weather and wildlife give cues before the player has to react. |
 
 ## Balance lens: Challenge
 
