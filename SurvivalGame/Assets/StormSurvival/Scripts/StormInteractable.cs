@@ -34,6 +34,7 @@ namespace StormSurvival
                 }
                 if (kind == Kind.Beacon)
                 {
+                    if (game.World.LookoutGate is { IsOpen: false }) return "Open the stone counterweight gate first";
                     if (game.World.Searchlight != null && !game.World.Searchlight.Aligned)
                         return "Align the lookout spotlight before lighting the beacon";
                     return "Hold E  /  light beacon  [6 wood + lit torch + power]";
@@ -103,6 +104,7 @@ namespace StormSurvival
                     break;
                 case Kind.Beacon:
                     if (!s.BridgeBuilt) { game.Toast("Reach the lookout by opening the river crossing first."); break; }
+                    if (game.World.LookoutGate is { IsOpen: false }) { game.Toast($"Deposit {StormLookoutGate.RequiredStones} stones at the lookout gate scale first."); break; }
                     if (!s.TorchLit) { game.Toast("Light your torch at a campfire first. Rewrap an empty torch in the crafting menu."); break; }
                     if (game.RescueGenerator == null || !game.RescueGenerator.Toggled || game.RescueGenerator.CurrentFuel <= 0) { game.Toast("Refill and start the lookout generator first. Use 2 + R to refill, then E to start it.", 7f); break; }
                     if (game.World.Searchlight != null && !game.World.Searchlight.Aligned)

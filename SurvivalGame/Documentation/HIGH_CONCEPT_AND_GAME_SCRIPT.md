@@ -13,7 +13,7 @@ Single-player first-person survival/adventure. Intended audience: players comfor
 3. **River / apply the tool differently.** The pickaxe now clears rubble rather than only collecting a resource. A falling trunk forms a crossing. Jump a branch on the narrow bridge while maintaining position. A fall costs warmth/health and sends the player ashore.
 4. **Far bank / plan ahead.** Build another fire, rest, replenish needs, and carry wood toward the lookout. A second wolf patrols the woods beyond the camp.
 5. **Ridge / apply crouching differently.** Gusts slow the player and push them sideways. Their timing and force change between adventures, with rising wind and swaying trees as warnings. Players can time the exposed shortcut or take the longer covered route with food and water. A third wolf patrols the upper ridge between the fork and the lookout camp.
-6. **Lookout / combine systems.** Fill the cup from the final barrel, refill the generator, and start it. Use the powered spotlight to find the clearing marked by three amber lamps. The clearing flashes back and a reply sounds. Ignite the beacon with six wood, a burning torch, and generator power. A short rescue transition leads to a results screen.
+6. **Lookout / combine systems.** Mine the marked rocks and deposit six stones at the counterweight scale to lift the gate. Fill the cup from the final barrel beyond the gate, refill the generator, and start it. Use the powered spotlight to find the clearing marked by three amber lamps. The clearing flashes back and a reply sounds. Ignite the beacon with six wood, a burning torch, and generator power. A short rescue transition leads to a results screen.
 
 ## Rules, states, and feedback
 
@@ -40,7 +40,7 @@ What challenges occur? Gathering while cooling, choosing when to rest, crossing 
 
 ## Balance lens: Meaningful Choices
 
-What choices affect outcomes? Spending wood on fire fuel, a torch rewrap, or saving six for the beacon; stowing a torch to conserve fuel; sprinting versus saving stamina; advancing versus warming up. Are choices understandable? Visible costs, inventory, fuel, and survival meters expose consequences. Is there always a dominant answer? The route should offer short fast crossings versus safe shelter stops, but testing must establish whether those choices feel useful. How are dead ends reduced? Renewable timber, four stone deposits, final fuel supplies, and recovery supplies support another attempt.
+What choices affect outcomes? Spending wood on fire fuel, a torch rewrap, or saving six for the beacon; stowing a torch to conserve fuel; sprinting versus saving stamina; advancing versus warming up. Are choices understandable? Visible costs, inventory, fuel, and survival meters expose consequences. Is there always a dominant answer? The route should offer short fast crossings versus safe shelter stops, but testing must establish whether those choices feel useful. How are dead ends reduced? Renewable timber, a lookout vein that replenishes while more stone is needed, final fuel supplies, and recovery supplies support another attempt.
 
 ## Iteration record — fill with real playtesting
 

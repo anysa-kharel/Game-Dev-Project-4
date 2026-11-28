@@ -40,10 +40,14 @@ namespace StormSurvival
         private float waterCooldown;
         private static StormRunLayout previousLayout;
 
+        private StormLookoutGate PendingLookoutGate => Needs.BridgeBuilt && Player != null && Player.transform.position.z >= 236f &&
+            World.LookoutGate is { IsOpen: false } gate ? gate : null;
+
         public string Objective
         {
             get
             {
+                if (PendingLookoutGate is StormLookoutGate gate) return gate.Objective;
                 if (!Needs.HasPickaxe) return "Select the pickaxe with 3.";
                 if (!Needs.FirstFire)
                     return Needs.Wood >= 3 && Needs.Stone >= 2
@@ -67,7 +71,7 @@ namespace StormSurvival
         {
             get
             {
-                
+                if (PendingLookoutGate is StormLookoutGate gate) return gate.ScalePosition;
                 if (!Needs.FirstFire || !Needs.HasTorch) return new Vector3(-5, 0, 24);
                 if (!Needs.TorchLit) return World.NearestFire(Player.transform.position).transform.position;
                 if (!Needs.BridgeBuilt) return new Vector3(2, 0, 125);

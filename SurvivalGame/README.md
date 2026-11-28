@@ -39,6 +39,7 @@ Gather wood and mine stone. Prepare a campfire and torch, clear the river crossi
 - The ridge splits into an exposed shortcut and a longer covered path with a food and water stop. Each adventure has different gust timing and strength. Rising wind and swaying trees warn of gusts, and crouching reduces their sideways push.
 - The sled, an optional food and water stash, and a spare fuel barrel move between marked sites when you start a new adventure. The sled gives two wood and up to 60 seconds of torch fuel, or one cloth if a wrap would go unused.
 - Three wolves patrol the logging trail, the woods beyond the far-bank camp, and the upper ridge in separate territories. Each can chase an exposed player, and a landed bite ends the run. Watch for the growl and lunge warning. Keep your distance while crouched, face it with an equipped lit torch, or fend it off with the pickaxe.
+- The lookout gate opens when you deposit six stones at its counterweight scale. Press E at the tray with stone in your inventory. Marked rocks on both sides of the approach supply stone, and a checkpoint retry keeps your deposits.
 - Failure returns you to your last campfire with recovery supplies. A checkpoint retry keeps the same supply locations and weather pattern. Starting a new adventure rolls a fresh setup.
 
 ## What's reused

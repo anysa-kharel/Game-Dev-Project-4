@@ -13,6 +13,7 @@ namespace StormSurvival
         public Material Amber { get; private set; }
         public Light Sun { get; private set; }
         public StormSearchlight Searchlight { get; private set; }
+        public StormLookoutGate LookoutGate { get; private set; }
         public IReadOnlyList<StormWolf> Wolves => wolves;
         private StormGame game;
         private StormRunLayout runLayout;
@@ -101,14 +102,19 @@ namespace StormSurvival
             PlaceMine(new Vector3(-4,0,16), false);
             PlaceMine(new Vector3(2,0,124), true);
             PlaceMine(new Vector3(7,0,161), false);
-            PlaceMine(new Vector3(-7,Height(244),244), false);
+            PlaceMine(new Vector3(-5.4f, Height(242.8f), 242.8f), false);
+            PlaceLookoutVein(new Vector3(7.2f, Height(243.8f), 243.8f), true);
+            Material gateStone = game.crawlspaceStoneMaterial != null ? game.crawlspaceStoneMaterial : rock;
+            LookoutGate = StormLookoutGate.Build(game, this, root, ForestBoundaryX, gateStone);
             AddTrailLog("Early jump lesson / fallen branch", new Vector3(0f, .27f, 47f), 2.9f, .65f);
             BuildCrouchBarrier();
             foreach (var p in new[] { new Vector3(4,0,17), new Vector3(-7,0,34), new Vector3(5,0,51), new Vector3(-6,0,67),
                 new Vector3(7,0,92),new Vector3(-5,0,110),new Vector3(5,0,120),new Vector3(6,0,149),
                 new Vector3(-6,0,169),new Vector3(5,0,190),new Vector3(-6,0,219),new Vector3(-6,0,245),new Vector3(5,0,254) }) WoodPile(p);
 
-            for (int z = 10; z < 264; z += 14) if (z < 125 || z > 145) Marker(new Vector3(3f, Height(z), z));
+            for (int z = 10; z < 264; z += 14)
+                if ((z < 125 || z > 145) && Mathf.Abs(z - StormLookoutGate.GateZ) >= 2f)
+                    Marker(new Vector3(3f, Height(z), z));
             PlaceSpareFuel();
             if (!isPreview) BuildWolves();
             LightScene();
@@ -438,14 +444,39 @@ namespace StormSurvival
                 if (source != null) { source.KeepPlacedHeight = true; source.refillAble = true; source.WaterAmount = 8; }
             }
         }
-        public void PlaceMine(Vector3 p, bool bridgeObstacle)
+        private Mineable PlaceMine(Vector3 p, bool bridgeObstacle, bool addMarker = true)
         {
             var obj = PlaceTemplate(game.miningRockTemplate,p,bridgeObstacle?1.5f:1.1f,Quaternion.identity);
-            if (obj == null) return;
+            if (obj == null) return null;
             var mine = obj.GetComponentInChildren<Mineable>(); if (mine == null) mine = obj.AddComponent<Mineable>();
             mine.Health = 150;
             var reward = mine.gameObject.AddComponent<StormMineReward>(); reward.bridgeObstacle = bridgeObstacle; reward.stone = 4; reward.Bind();
-            Shape("Amber mining marker",PrimitiveType.Cube,root,p+new Vector3(0,1.7f,0),new Vector3(.45f,.12f,.12f),Amber,false);
+            if (addMarker)
+                Shape("Amber mining marker",PrimitiveType.Cube,root,p+new Vector3(0,1.7f,0),new Vector3(.45f,.12f,.12f),Amber,false);
+            return mine;
+        }
+
+        private void PlaceLookoutVein(Vector3 position, bool addMarker)
+        {
+            var mine = PlaceMine(position, false, addMarker);
+            if (mine != null && !isPreview)
+                mine.Depleted += _ => StartCoroutine(ReplenishLookoutVein(position));
+        }
+
+        private IEnumerator ReplenishLookoutVein(Vector3 position)
+        {
+            yield return new WaitForSeconds(24f);
+            var checkAgain = new WaitForSeconds(1f);
+            while (LookoutGate.StonesRemaining > 0)
+            {
+                if (game.Needs.Stone < LookoutGate.StonesRemaining &&
+                    (game.Player.transform.position - position).sqrMagnitude > 2.2f * 2.2f)
+                {
+                    PlaceLookoutVein(position, false);
+                    yield break;
+                }
+                yield return checkAgain;
+            }
         }
 
         private void BuildRiver()

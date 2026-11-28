@@ -133,6 +133,14 @@ public class ObjectUsage : MonoBehaviour
             return;
         }
 
+        if (target is StormLookoutGate gate)
+        {
+            CancelHold();
+            if (Input.GetKeyDown(KeyCode.E)) gate.Use();
+            CurrentPrompt = gate.Prompt;
+            return;
+        }
+
         if (target is StormSearchlight searchlight)
         {
             CancelHold();
@@ -323,6 +331,8 @@ public class ObjectUsage : MonoBehaviour
         if (wolf != null) return wolf.CanTarget ? wolf : null;
         var sled = collider.GetComponentInParent<StormSupplySled>();
         if (sled != null) return sled.CanTarget ? sled : null;
+        var gate = collider.GetComponentInParent<StormLookoutGate>();
+        if (gate != null) return gate;
         var searchlight = collider.GetComponentInParent<StormSearchlight>();
         if (searchlight != null) return searchlight;
 

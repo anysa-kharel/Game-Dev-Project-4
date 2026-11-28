@@ -22,6 +22,7 @@ namespace StormSurvival
             Add("thunder",2f,40,.5f,.7f);Add("failure",1f,65,.2f,.6f);Add("success",2f,440,.01f,.65f);
             Add("sled release", .48f, 135f, .82f, .72f);
             Add("spotlight turn", .38f, 185f, .46f, .55f);
+            Add("gate lift", 2.2f, 52f, .65f, .68f);
             Add("signal reply", 1.15f, 705f, .06f, .62f);
             AddWolfSound("wolf warning", 1.45f, 380f, .17f);
             AddWolfSound("wolf bite", .25f, 110f, .62f);

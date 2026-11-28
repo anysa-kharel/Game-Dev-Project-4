@@ -26,6 +26,8 @@ Editor runtime status: **not run in this environment**. Record results locally.
 - Pause, craft, focus loss, retry and restart work; timers stop during pause. Release a grabbed prop on pause.
 - Validate Running Level succeeds early in a run. Finish a Windows, Mac, and Linux build and test each required release on its target platform.
 
+- At the lookout, mine both marked rocks and deposit stone at the counterweight scale. Check progress after four stones and confirm the passage lifts at six. Retry before and after opening to check that deposits and access persist.
+
 ## Replay variation
 
 - Start two adventures. Check which sled, supply stash, spare fuel, and wolf locations changed. Verify that the early supplies and lookout fuel remain accessible.
