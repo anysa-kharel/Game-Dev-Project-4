@@ -67,7 +67,8 @@ namespace StormSurvival.Editor
             int wood=0,fires=0,beacons=0;
             foreach(var item in StormInteractable.All)
             {if(item.kind==StormInteractable.Kind.Wood)wood++;if(item.kind==StormInteractable.Kind.Campfire)fires++;if(item.kind==StormInteractable.Kind.Beacon)beacons++;}
-            if(wood<10||fires!=4||beacons!=1)throw new Exception("World interactions are incomplete.");
+            if(wood<10||fires!=7||beacons!=1||game.World.Backcountry==null||game.World.Wolves.Count!=5)
+                throw new Exception("World interactions are incomplete.");
             if(!game.Needs.BridgeBuilt&&Object.FindObjectsByType<StormMineReward>(FindObjectsSortMode.None).Length<1)throw new Exception("Mine rewards are missing.");
             if(!game.World.IsSheltered(new Vector3(-5,0,24)))throw new Exception("Trailhead shelter bounds do not cover the camp.");
             if(Mathf.Abs(StormWorld.Height(136)+3f)>.001f)throw new Exception("River terrain is incorrect.");

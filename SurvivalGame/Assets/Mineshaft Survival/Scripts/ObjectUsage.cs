@@ -141,6 +141,14 @@ public class ObjectUsage : MonoBehaviour
             return;
         }
 
+        if (target is StormTrailTask trailTask)
+        {
+            CancelHold();
+            if (Input.GetKeyDown(KeyCode.E)) trailTask.Use();
+            CurrentPrompt = trailTask.CanTarget ? trailTask.Prompt : string.Empty;
+            return;
+        }
+
         if (target is StormSearchlight searchlight)
         {
             CancelHold();
@@ -333,6 +341,8 @@ public class ObjectUsage : MonoBehaviour
         if (sled != null) return sled.CanTarget ? sled : null;
         var gate = collider.GetComponentInParent<StormLookoutGate>();
         if (gate != null) return gate;
+        var trailTask = collider.GetComponentInParent<StormTrailTask>();
+        if (trailTask != null) return trailTask.CanTarget ? trailTask : null;
         var searchlight = collider.GetComponentInParent<StormSearchlight>();
         if (searchlight != null) return searchlight;
 

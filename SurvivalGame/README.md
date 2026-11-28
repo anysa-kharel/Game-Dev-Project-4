@@ -23,7 +23,7 @@ Gather wood and mine stone. Prepare a campfire and torch, clear the river crossi
 | 1 / 2 / 3 | Torch / fuel cup / pickaxe |
 | Left click | Swing the held tool; pickaxe mines rocks and timber |
 | Hold E | Campfire, supply crate, beacon |
-| E | Eat, drink, collect supplies or barrel fuel, toggle equipment, turn the rescue spotlight |
+| E | Eat, drink, collect supplies or fuel, use trail equipment, turn the rescue spotlight |
 | R with fuel cup | Refill generator or lantern |
 | Right mouse | Hold a movable prop or grab the optional supply sled. Step toward the trail to pull the sled free. |
 | Tab | Craft or rewrap torch; pauses play |
@@ -38,8 +38,10 @@ Gather wood and mine stone. Prepare a campfire and torch, clear the river crossi
 - Shelter reduces exposure; fires restore warmth faster. Water immersion costs health and warmth and returns you to shore.
 - The ridge splits into an exposed shortcut and a longer covered path with a food and water stop. Each adventure has different gust timing and strength. Rising wind and swaying trees warn of gusts, and crouching reduces their sideways push.
 - The sled, an optional food and water stash, and a spare fuel barrel move between marked sites when you start a new adventure. The sled gives two wood and up to 60 seconds of torch fuel, or one cloth if a wrap would go unused.
-- Three wolves patrol the logging trail, the woods beyond the far-bank camp, and the upper ridge in separate territories. Each can chase an exposed player, and a landed bite ends the run. Watch for the growl and lunge warning. Keep your distance while crouched, face it with an equipped lit torch, or fend it off with the pickaxe.
+- Five wolves patrol separate territories along the route. Two hunt beyond the counterweight gate on the ranger trail and in the relay woods. Each can chase an exposed player, and a landed bite ends the run. Watch for the growl and lunge warning. Keep your distance while crouched, face it with an equipped lit torch, or fend it off with the pickaxe.
 - The lookout gate opens when you deposit six stones at its counterweight scale. Press E at the tray with stone in your inventory. Marked rocks on both sides of the approach supply stone, and a checkpoint retry keeps your deposits.
+- Beyond the gate, find the handle at the ranger shed and use the service winch to lower the washout bridge. Reset both trail breakers in either order, then restore the rescue relay before heading up to the summit beacon.
+- The stocked Ranger, Relay, and Summit campfires light with Hold E and set checkpoints. Bridge and relay progress persists on checkpoint retry.
 - Failure returns you to your last campfire with recovery supplies. A checkpoint retry keeps the same supply locations and weather pattern. Starting a new adventure rolls a fresh setup.
 
 ## What's reused

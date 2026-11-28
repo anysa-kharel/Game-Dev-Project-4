@@ -13,7 +13,10 @@ Single-player first-person survival/adventure. Intended audience: players comfor
 3. **River / apply the tool differently.** The pickaxe now clears rubble rather than only collecting a resource. A falling trunk forms a crossing. Jump a branch on the narrow bridge while maintaining position. A fall costs warmth/health and sends the player ashore.
 4. **Far bank / plan ahead.** Build another fire, rest, replenish needs, and carry wood toward the lookout. A second wolf patrols the woods beyond the camp.
 5. **Ridge / apply crouching differently.** Gusts slow the player and push them sideways. Their timing and force change between adventures, with rising wind and swaying trees as warnings. Players can time the exposed shortcut or take the longer covered route with food and water. A third wolf patrols the upper ridge between the fork and the lookout camp.
-6. **Lookout / combine systems.** Mine the marked rocks and deposit six stones at the counterweight scale to lift the gate. Fill the cup from the final barrel beyond the gate, refill the generator, and start it. Use the powered spotlight to find the clearing marked by three amber lamps. The clearing flashes back and a reply sounds. Ignite the beacon with six wood, a burning torch, and generator power. A short rescue transition leads to a results screen.
+6. **Lookout gate.** Mine the marked rocks and deposit six stones at the counterweight scale to lift the gate.
+7. **Ranger trail and washout.** Stop at the stocked Ranger camp. Find the handle in the ranger shed, evade the wolf, and lower the footbridge at the service winch.
+8. **Relay woods.** Light the stocked Relay campfire and choose which breaker spur to visit first. A wolf roams the paths between the breakers. Reset both, then restore the rescue relay.
+9. **Summit lookout.** Warm up and relight the torch at Summit camp. Fill the cup from the final barrel, refill the generator, and start it. Use the powered spotlight to find the clearing marked by three amber lamps. The clearing flashes back and a reply sounds. Ignite the beacon with six wood, a burning torch, and generator power. A short rescue transition leads to a results screen.
 
 ## Rules, states, and feedback
 
@@ -32,7 +35,7 @@ The HUD shows the objective direction/distance, inventory, six survival meters, 
 | Actions | Move, look, sprint, jump, crouch, mine, gather, craft, light, refill, toggle, rest, and signal rescue. |
 | Rules | Exact crafting costs, stamina costs, exposure rates, interaction distances, checkpoint recovery, and the combined rescue condition. |
 | Skill | Navigation, timing jumps, bracing during gusts, remembering tools, and planning resource use. |
-| Chance | Each new adventure chooses a seeded layout for optional supplies, three wolf patrols, and gusts. Core materials and the route to rescue stay accessible. Weather and wildlife give cues before the player has to react. |
+| Chance | Each new adventure chooses a seeded layout for optional supplies, five wolf patrols, and gusts. Core materials and the route to rescue stay accessible. Weather and wildlife give cues before the player has to react. |
 
 ## Balance lens: Challenge
 

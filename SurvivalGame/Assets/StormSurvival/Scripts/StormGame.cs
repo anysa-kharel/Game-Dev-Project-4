@@ -43,11 +43,15 @@ namespace StormSurvival
         private StormLookoutGate PendingLookoutGate => Needs.BridgeBuilt && Player != null && Player.transform.position.z >= 236f &&
             World.LookoutGate is { IsOpen: false } gate ? gate : null;
 
+        private StormBackcountry PendingBackcountry => Needs.BridgeBuilt && Player != null && Player.transform.position.z >= 236f &&
+            World.LookoutGate is { IsOpen: true } && World.Backcountry is { RelayReady: false } backcountry ? backcountry : null;
+
         public string Objective
         {
             get
             {
                 if (PendingLookoutGate is StormLookoutGate gate) return gate.Objective;
+                if (PendingBackcountry is StormBackcountry backcountry) return backcountry.Objective;
                 if (!Needs.HasPickaxe) return "Select the pickaxe with 3.";
                 if (!Needs.FirstFire)
                     return Needs.Wood >= 3 && Needs.Stone >= 2
@@ -59,7 +63,8 @@ namespace StormSurvival
                 if (Player != null && Player.transform.position.z < 176f) return "Cross the trunk bridge. Warm up at the far-bank camp.";
                 if (Player != null && Player.transform.position.z < 236f)
                     return "Reach the lookout. Take cover or cross the exposed shortcut during a lull.";
-                if (RescueGenerator == null || RescueGenerator.CurrentFuel <= 0f) return "Take fuel from the barrel with 2 then E. Refill the lookout generator with R.";
+                if (RescueGenerator == null || RescueGenerator.CurrentFuel <= 0f)
+                    return Player.FuelCup.HoldingNow > 0 ? "Use R with the fuel cup at the summit generator." : "Take fuel from the summit barrel with 2 then E.";
                 if (!RescueGenerator.Toggled) return "Press E at the refilled generator to power the lookout.";
                 if (World.Searchlight != null && !World.Searchlight.Aligned)
                     return "Use E at the spotlight to aim at the clearing marked by three amber lamps.";
@@ -72,17 +77,21 @@ namespace StormSurvival
             get
             {
                 if (PendingLookoutGate is StormLookoutGate gate) return gate.ScalePosition;
+                if (PendingBackcountry is StormBackcountry backcountry) return backcountry.ObjectivePosition;
                 if (!Needs.FirstFire || !Needs.HasTorch) return new Vector3(-5, 0, 24);
                 if (!Needs.TorchLit) return World.NearestFire(Player.transform.position).transform.position;
                 if (!Needs.BridgeBuilt) return new Vector3(2, 0, 125);
                 if (Player.transform.position.z >= 236f)
                 {
+                    if (RescueGenerator != null && RescueGenerator.CurrentFuel <= 0f && Player.FuelCup.HoldingNow <= 0 && World.RescueFuel != null)
+                        return World.RescueFuel.transform.position;
                     if (RescueGenerator != null && (!RescueGenerator.Toggled || RescueGenerator.CurrentFuel <= 0f))
                         return RescueGenerator.transform.position;
                     if (World.Searchlight != null && !World.Searchlight.Aligned)
                         return World.Searchlight.transform.position;
                 }
-                return new Vector3(0f, StormWorld.Height(258f), 258f);
+                if (Player.transform.position.z < 236f) return new Vector3(0f, StormWorld.Height(236f), 236f);
+                return World.RescueBeacon.transform.position;
             }
         }
 
@@ -139,11 +148,10 @@ namespace StormSurvival
             Needs.Health = Player.Stats.Health * 0.1f;
             Needs.Step(Time.deltaTime, Sheltered, Warming, Weather.Intensity, Player.Inventory.selected == 0);
             Vector3 position = Player.transform.position;
-            if (waterCooldown <= 0f && position.z > 129f && position.z < 143f && position.y < -0.45f)
+            if (waterCooldown <= 0f && TryGetFloodedShore(position, out float shore))
             {
                 waterCooldown = 3f;
                 Needs.Damage(24f); Needs.Wetness = 100f; Needs.Warmth = Mathf.Max(0, Needs.Warmth - 22f);
-                float shore = Needs.BridgeBuilt && position.z > 136f ? 146f : 126f;
                 Player.Teleport(new Vector3(0, StormWorld.Height(shore) + 0.2f, shore));
                 Audio.Play("water", position, 0.8f);
                 Toast("The current swept you ashore. You are soaked. Find shelter or fire.", 7f);
@@ -151,6 +159,24 @@ namespace StormSurvival
             if (position.y < -12f) Needs.Damage(100f);
             Player.Stats.Health = Needs.Health * 10f;
             if (!Needs.Alive) Fail();
+        }
+
+        private bool TryGetFloodedShore(Vector3 position, out float shore)
+        {
+            if (position.z > 129f && position.z < 143f && position.y < -.45f)
+            {
+                shore = Needs.BridgeBuilt && position.z > 136f ? 146f : 126f;
+                return true;
+            }
+            if (position.z > StormWorld.WashoutStart && position.z < StormWorld.WashoutEnd &&
+                position.y < StormWorld.WashoutBankHeight - .65f)
+            {
+                float midpoint = (StormWorld.WashoutStart + StormWorld.WashoutEnd) * .5f;
+                shore = World.Backcountry.CrossingReady && position.z > midpoint ? StormWorld.WashoutEnd + 2f : StormWorld.WashoutStart - 2f;
+                return true;
+            }
+            shore = 0f;
+            return false;
         }
 
         internal void FailFromWolf()

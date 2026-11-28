@@ -14,6 +14,9 @@ namespace StormSurvival
         public Light Sun { get; private set; }
         public StormSearchlight Searchlight { get; private set; }
         public StormLookoutGate LookoutGate { get; private set; }
+        public StormBackcountry Backcountry { get; private set; }
+        public StormInteractable RescueBeacon { get; private set; }
+        public OilBarrel RescueFuel { get; private set; }
         public IReadOnlyList<StormWolf> Wolves => wolves;
         private StormGame game;
         private StormRunLayout runLayout;
@@ -52,6 +55,18 @@ namespace StormSurvival
                 (new Vector2(3.45f, 205.5f), new Vector2(-4.55f, 208f)),
                 (new Vector2(3.5f, 215.7f), new Vector2(-4.2f, 218.3f)),
                 (new Vector2(3.2f, 224.4f), new Vector2(-5f, 227.2f))
+            }),
+            ("Ranger trail", new Vector2(277f, 299f), new[]
+            {
+                (new Vector2(3.2f, 287.8f), new Vector2(-2.6f, 289.5f)),
+                (new Vector2(-3f, 293f), new Vector2(2.8f, 295f)),
+                (new Vector2(3.2f, 295.8f), new Vector2(-2.8f, 297.7f))
+            }),
+            ("Relay woods", new Vector2(341f, 398f), new[]
+            {
+                (new Vector2(-3.2f, 365.5f), new Vector2(3.2f, 367.6f)),
+                (new Vector2(3.2f, 375.2f), new Vector2(-3.2f, 377f)),
+                (new Vector2(-3.3f, 389.7f), new Vector2(3f, 392f))
             })
         };
 
@@ -59,13 +74,21 @@ namespace StormSurvival
         internal const float WolfAreaHalfWidth = 29f;
         private const float ForestBoundaryX = 40f;
         private const float CrouchBarrierZ = 57f;
+        private const int ForestEndZ = 459;
+        private const float BeaconZ = 446f;
+        internal const float WashoutStart = 303f;
+        internal const float WashoutEnd = 321f;
+        internal const float WashoutBankHeight = 20f;
 
         public static float Height(float z)
         {
             if (z > 128f && z < 130f) return -(z - 128f) * 1.5f;
             if (z >= 130f && z <= 142f) return -3f;
             if (z > 142f && z < 144f) return (z - 144f) * 1.5f;
-            return z > 175f ? Mathf.Min(20f, (z - 175f) * 0.22f) : 0f;
+            if (z > WashoutStart && z < WashoutEnd)
+                return WashoutBankHeight - Mathf.Min(3.6f, Mathf.Min(z - WashoutStart, WashoutEnd - z) * 1.45f);
+            float ridge = z > 175f ? Mathf.Min(WashoutBankHeight, (z - 175f) * .22f) : 0f;
+            return ridge + Mathf.Clamp(z - 340f, 0f, ForestEndZ - 340f) * .045f;
         }
 
         public void Build(StormGame owner, Transform previewRoot = null)
@@ -85,7 +108,7 @@ namespace StormSurvival
             plaster = MakeMaterial(new Color(0.75f, 0.70f, 0.54f));
             roof = MakeMaterial(new Color(0.27f, 0.18f, 0.14f));
             dark = MakeMaterial(new Color(0.13f, 0.15f, 0.11f));
-            BuildGround(); BuildForest(); BuildLoggingCamp(); BuildRiver(); BuildLookout();
+            BuildGround(); BuildForest(); BuildLoggingCamp(); BuildRiver();
             RingFire(new Vector3(-5, 0, 24), "Trailhead camp");
             RingFire(new Vector3(-8, 0, 82), "Logging camp");
             RingFire(new Vector3(-5, 0, 153), "Far-bank shelter");
@@ -106,13 +129,18 @@ namespace StormSurvival
             PlaceLookoutVein(new Vector3(7.2f, Height(243.8f), 243.8f), true);
             Material gateStone = game.crawlspaceStoneMaterial != null ? game.crawlspaceStoneMaterial : rock;
             LookoutGate = StormLookoutGate.Build(game, this, root, ForestBoundaryX, gateStone);
+            StormBackcountryTrail.Build(this, root, shelters.Add);
+            BuildWashoutWater();
+            Backcountry = StormBackcountry.Build(game, this, root, isPreview);
+            BuildBackcountryCamps();
+            BuildLookout();
             AddTrailLog("Early jump lesson / fallen branch", new Vector3(0f, .27f, 47f), 2.9f, .65f);
             BuildCrouchBarrier();
             foreach (var p in new[] { new Vector3(4,0,17), new Vector3(-7,0,34), new Vector3(5,0,51), new Vector3(-6,0,67),
                 new Vector3(7,0,92),new Vector3(-5,0,110),new Vector3(5,0,120),new Vector3(6,0,149),
                 new Vector3(-6,0,169),new Vector3(5,0,190),new Vector3(-6,0,219),new Vector3(-6,0,245),new Vector3(5,0,254) }) WoodPile(p);
 
-            for (int z = 10; z < 264; z += 14)
+            for (int z = 10; z < 250; z += 14)
                 if ((z < 125 || z > 145) && Mathf.Abs(z - StormLookoutGate.GateZ) >= 2f)
                     Marker(new Vector3(3f, Height(z), z));
             PlaceSpareFuel();
@@ -297,7 +325,7 @@ namespace StormSurvival
         }
         private void BuildGround()
         {
-            const int nx = 41, nz = 151;
+            const int nx = 41, nz = (ForestEndZ + 15) / 2 + 1;
             var vertices = new Vector3[nx*nz]; var uv = new Vector2[vertices.Length]; var indices = new int[(nx-1)*(nz-1)*6];
             for (int z=0;z<nz;z++) for(int x=0;x<nx;x++)
             {
@@ -310,7 +338,7 @@ namespace StormSurvival
             terrainMesh = new Mesh { name="Forest ground and river banks",vertices=vertices,uv=uv,triangles=indices };
             terrainMesh.RecalculateNormals(); terrainMesh.RecalculateBounds(); ownedMeshes.Add(terrainMesh);
             var obj=Group("Forest terrain",Vector3.zero).gameObject;obj.AddComponent<MeshFilter>().sharedMesh=terrainMesh;obj.AddComponent<MeshRenderer>().sharedMaterial=grass;obj.AddComponent<MeshCollider>().sharedMesh=terrainMesh;
-            for(int z=-10;z<280;z+=4)
+            for(int z=-10;z<250;z+=4)
             {
                 if(z>126&&z<146)continue;
                 float y=Height(z);
@@ -318,15 +346,15 @@ namespace StormSurvival
                 if(z>175)patch.transform.rotation=Quaternion.Euler(-Mathf.Atan(0.22f)*Mathf.Rad2Deg,0,0);
             }
             for(int side=-1;side<=1;side+=2)
-                for(int z=-10;z<280;z+=12)
+                for(int z=-10;z<ForestEndZ;z+=12)
                     Shape("Forest boundary rocks",PrimitiveType.Cube,root,new Vector3(side*ForestBoundaryX,Height(z)+3,z),new Vector3(3,7,13),rock);
             Shape("Trailhead boundary",PrimitiveType.Cube,root,new Vector3(0,3,-15),new Vector3(82,7,3),rock);
-            Shape("Lookout boundary",PrimitiveType.Cube,root,new Vector3(0,Height(283)+3,283),new Vector3(82,7,3),rock);
+            Shape("Summit boundary",PrimitiveType.Cube,root,new Vector3(0,Height(ForestEndZ)+3,ForestEndZ),new Vector3(82,7,3),rock);
         }
         private void BuildForest()
         {
             var random=new System.Random(824);
-            for(int z=-5;z<276;z+=6)
+            for(int z=-5;z<ForestEndZ-4;z+=6)
                 for(int side=-1;side<=1;side+=2)
                     for(int row=0;row<2;row++)
                     {
@@ -337,7 +365,8 @@ namespace StormSurvival
                         var prefab=game.trees[random.Next(game.trees.Length)];if(prefab==null)continue;
                         float rotation = (float)random.NextDouble() * 360f;
                         float scale = 1f + (float)random.NextDouble() * .5f;
-                        if (Mathf.Abs(zz - CrouchBarrierZ) < 1.95f) continue;
+                        if (Mathf.Abs(zz - CrouchBarrierZ) < 1.95f ||
+                            (zz > 250f && (InWashout(zz) || StormBackcountryTrail.NearTrail(x, zz)))) continue;
                         var tree=Instantiate(prefab,new Vector3(x,Height(zz),zz),Quaternion.Euler(0,rotation,0),root);
                         tree.transform.localScale *= scale;
                         foreach(var col in tree.GetComponentsInChildren<Collider>()){col.enabled=false;if(Application.isPlaying)Destroy(col);else DestroyImmediate(col);}
@@ -357,10 +386,12 @@ namespace StormSurvival
                         trunk.height = 7f;
                         trunk.center = Vector3.up * 3.5f;
                     }
-            for(int z=30;z<260;z+=23)
+            for(int z=30;z<ForestEndZ-4;z+=23)
             {
                 if(z>124&&z<147)continue;
                 float x=z%2==0?-9:9;
+                if (z > 250 && (InWashout(z) || StormBackcountryTrail.NearTrail(x, z) ||
+                    StormBackcountryTrail.NearTrail(x - 3f, z) || StormBackcountryTrail.NearTrail(x + 3f, z))) continue;
                 if(game.rocks!=null&&game.rocks.Length>0)
                 { var b=Instantiate(game.rocks[(z/23)%game.rocks.Length],new Vector3(x,Height(z),z),Quaternion.identity,root);b.transform.localScale*=2.2f; }
             }
@@ -502,9 +533,42 @@ namespace StormSurvival
             game.Needs.BridgeBuilt=true;
             game.Toast("The bridge is ready. Keep to the middle and jump its raised branch.",7f);
         }
+        private static bool InWashout(float z) => z >= WashoutStart - 1f && z <= WashoutEnd + 1f;
+
+        private void BuildWashoutWater()
+        {
+            var water = MakeMaterial(new Color(.11f, .19f, .17f));
+            water.SetFloat("_Smoothness", .78f);
+            float center = (WashoutStart + WashoutEnd) * .5f;
+            Shape("Flooded washout", PrimitiveType.Cube, root, new Vector3(0f, WashoutBankHeight - 1.08f, center),
+                new Vector3(ForestBoundaryX * 2f, .05f, WashoutEnd - WashoutStart - 1f), water, false);
+        }
+
+        private void BuildBackcountryCamps()
+        {
+            var rangerCamp = new Vector3(5f, Height(267f), 267f);
+            var relayCamp = new Vector3(-6f, Height(331f), 331f);
+            var summitCamp = new Vector3(7f, Height(427f), 427f);
+            RingFire(rangerCamp, "Ranger camp", stocked: true);
+            RingFire(relayCamp, "Relay camp", stocked: true);
+            RingFire(summitCamp, "Summit camp", stocked: true);
+            Shelter(rangerCamp, 7.5f, 7f);
+            Shelter(relayCamp, 8f, 8f);
+            Shelter(summitCamp, 8f, 7f);
+            PlaceTemplateSupplies(new Vector3(3.5f, Height(268.8f), 268.8f));
+            PlaceTemplateSupplies(new Vector3(-7.5f, Height(332.8f), 332.8f));
+            PlaceTemplateSupplies(new Vector3(5.5f, Height(428.8f), 428.8f));
+            foreach (var position in new[] { new Vector3(-4.8f,0,268f), new Vector3(5.2f,0,299f),
+                new Vector3(-9f,0,333.8f), new Vector3(9f,0,377f), new Vector3(-5.2f,0,418f),
+                new Vector3(4.6f,0,430f), new Vector3(-5.5f,0,444f), new Vector3(5.4f,0,449f) })
+                WoodPile(position);
+            PlaceMine(new Vector3(-9.2f, Height(328.4f), 328.4f), false);
+            PlaceMine(new Vector3(11.5f, Height(429f), 429f), false);
+        }
+
         private void BuildLookout()
         {
-            var lookout=Group("Rescue lookout",new Vector3(0,Height(258),258));
+            var lookout=Group("Rescue lookout",new Vector3(0,Height(BeaconZ),BeaconZ));
             for(int x=-1;x<=1;x+=2)for(int z=-1;z<=1;z+=2)
                 Shape("Lookout pillar",PrimitiveType.Cube,lookout,new Vector3(x*3,4,z*3),new Vector3(.38f,8,.38f),Wood);
             Shape("Lookout canopy",PrimitiveType.Cube,lookout,new Vector3(0,8,0),new Vector3(7,.3f,7),roof);
@@ -515,9 +579,11 @@ namespace StormSurvival
             var item = beacon.gameObject.AddComponent<StormInteractable>();
             item.kind = StormInteractable.Kind.Beacon;
             item.label = "Rescue beacon";
+            RescueBeacon = item;
             item.flame = Fire(beacon, new Vector3(0, 1.3f, 0), 2f);
             item.flame.SetActive(false);
-            var generator = PlaceTemplate(game.generatorTemplate,new Vector3(5,Height(255),255),1.55f,Quaternion.identity);
+            const float generatorZ = BeaconZ - 3f;
+            var generator = PlaceTemplate(game.generatorTemplate,new Vector3(5,Height(generatorZ),generatorZ),1.55f,Quaternion.identity);
             if (generator != null)
             {
                 var rescueGenerator = generator.GetComponentInChildren<Generator>();
@@ -526,11 +592,19 @@ namespace StormSurvival
                 rescueGenerator.Toggled = false;
                 if (!isPreview) game.RescueGenerator = rescueGenerator;
             }
-            var spotlight = PlaceTemplate(game.spotlightTemplate, new Vector3(-4f, Height(256f), 256f), 2.5f, Quaternion.identity);
+            const float spotlightZ = BeaconZ - 2f;
+            var spotlight = PlaceTemplate(game.spotlightTemplate, new Vector3(-4f, Height(spotlightZ), spotlightZ), 2.5f, Quaternion.identity);
             var power = generator != null ? generator.GetComponentInChildren<Generator>() : null;
             Searchlight = StormSearchlight.Build(game, this, lookout, power, spotlight);
-            var barrel = PlaceTemplate(game.fuelTemplate,new Vector3(8,Height(250),250),1.5f,Quaternion.identity);
-            if (barrel != null) { var source = barrel.GetComponentInChildren<OilBarrel>(); source.fuel = 4; source.MaxFuel = 4; }
+            const float fuelZ = BeaconZ - 8f;
+            var barrel = PlaceTemplate(game.fuelTemplate,new Vector3(6.8f,Height(fuelZ),fuelZ),1.5f,Quaternion.identity);
+            if (barrel != null)
+            {
+                RescueFuel = barrel.GetComponentInChildren<OilBarrel>();
+                RescueFuel.fuel = 4;
+                RescueFuel.MaxFuel = 4;
+                Marker(new Vector3(5.4f, Height(fuelZ), fuelZ));
+            }
 
         }
         private void WoodPile(Vector3 p)
@@ -540,12 +614,12 @@ namespace StormSurvival
             Shape("Amber resource wrap",PrimitiveType.Cube,visual.transform,new Vector3(0,.45f,0),new Vector3(1.4f,.1f,.18f),Amber,false);
             var item=pile.gameObject.AddComponent<StormInteractable>();item.kind=StormInteractable.Kind.Wood;item.label="Firewood";item.model=visual;item.quantity=4;
         }
-        private void RingFire(Vector3 p,string label)
+        private void RingFire(Vector3 p,string label, bool stocked = false)
         {
             var ring=Group(label,p);
             for(int i=0;i<10;i++){float a=i*Mathf.PI*2/10;Shape("Fire ring stone",PrimitiveType.Sphere,ring,new Vector3(Mathf.Cos(a)*.8f,.15f,Mathf.Sin(a)*.8f),new Vector3(.4f,.3f,.38f),rock);}
             Shape("Fire interaction stone",PrimitiveType.Cylinder,ring,new Vector3(0,.16f,0),new Vector3(1.3f,.16f,1.3f),dark);
-            var item=ring.gameObject.AddComponent<StormInteractable>();item.kind=StormInteractable.Kind.Campfire;item.label=label;
+            var item=ring.gameObject.AddComponent<StormInteractable>();item.kind=StormInteractable.Kind.Campfire;item.label=label;item.stocked=stocked;
             item.flame=Fire(ring,new Vector3(0,.3f,0),1f);item.flame.SetActive(false);fires.Add(item);
         }
         private void Shelter(Vector3 p,float width,float depth)

@@ -12,6 +12,7 @@ namespace StormSurvival
         public int quantity = 4;
         public GameObject model, flame;
         public float fuel;
+        public bool stocked;
         private int strikes;
         private bool collected;
         private float regrow;
@@ -27,7 +28,7 @@ namespace StormSurvival
                     return !s.HasPickaxe ? "Select the pickaxe with 3" : "Left click  /  break down timber  " + strikes + "/3";
                 if (kind == Kind.Campfire)
                 {
-                    if (fuel <= 0f) return "Hold E  /  build campfire  [3 wood + 2 stone]";
+                    if (fuel <= 0f) return stocked ? "Hold E  /  light stocked campfire" : "Hold E  /  build campfire  [3 wood + 2 stone]";
                     if (s.HasTorch && !s.TorchLit && s.TorchFuel > 0f) return "Hold E  /  light your torch";
                     if (fuel < 55f) return "Hold E  /  add fuel  [1 wood]";
                     return "Hold E  /  rest and save checkpoint";
@@ -35,6 +36,7 @@ namespace StormSurvival
                 if (kind == Kind.Beacon)
                 {
                     if (game.World.LookoutGate is { IsOpen: false }) return "Open the stone counterweight gate first";
+                    if (game.World.Backcountry is { RelayReady: false }) return "Restore the rescue relay before lighting the beacon";
                     if (game.World.Searchlight != null && !game.World.Searchlight.Aligned)
                         return "Align the lookout spotlight before lighting the beacon";
                     return "Hold E  /  light beacon  [6 wood + lit torch + power]";
@@ -88,7 +90,8 @@ namespace StormSurvival
                 case Kind.Campfire:
                     if (fuel <= 0f)
                     {
-                        if (!s.BuildCampfire()) { game.Toast("Need 3 wood + 2 stone. Gather timber and mine marked rocks with 3 + left click."); break; }
+                        if (!stocked && !s.BuildCampfire()) { game.Toast("Need 3 wood + 2 stone. Gather timber and mine marked rocks with 3 + left click."); break; }
+                        stocked = false;
                         fuel = 150f; s.FirstFire = true; flame.SetActive(true);
                         game.Audio.Play("fire", transform.position, 0.65f); game.SetCheckpoint(this);
                     }
@@ -105,6 +108,7 @@ namespace StormSurvival
                 case Kind.Beacon:
                     if (!s.BridgeBuilt) { game.Toast("Reach the lookout by opening the river crossing first."); break; }
                     if (game.World.LookoutGate is { IsOpen: false }) { game.Toast($"Deposit {StormLookoutGate.RequiredStones} stones at the lookout gate scale first."); break; }
+                    if (game.World.Backcountry is { RelayReady: false }) { game.Toast("Restore the rescue relay before lighting the beacon."); break; }
                     if (!s.TorchLit) { game.Toast("Light your torch at a campfire first. Rewrap an empty torch in the crafting menu."); break; }
                     if (game.RescueGenerator == null || !game.RescueGenerator.Toggled || game.RescueGenerator.CurrentFuel <= 0) { game.Toast("Refill and start the lookout generator first. Use 2 + R to refill, then E to start it.", 7f); break; }
                     if (game.World.Searchlight != null && !game.World.Searchlight.Aligned)

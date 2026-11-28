@@ -108,7 +108,7 @@ namespace StormSurvival
             if (lift < 1f) return;
 
             IsOpen = true;
-            game.Toast("Lookout gate open. Follow the trail to the generator.", 5f);
+            game.Toast("Lookout gate open. Follow the trail to the ranger camp.", 5f);
         }
 
         private void BuildBarrier(StormWorld world, Transform entrance, float forestBoundary,

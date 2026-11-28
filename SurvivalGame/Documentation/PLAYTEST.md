@@ -28,11 +28,15 @@ Editor runtime status: **not run in this environment**. Record results locally.
 
 - At the lookout, mine both marked rocks and deposit stone at the counterweight scale. Check progress after four stones and confirm the passage lifts at six. Retry before and after opening to check that deposits and access persist.
 
+- After the counterweight gate, light the stocked Ranger, Relay, and Summit campfires. Check that each becomes the active checkpoint.
+- Take the handle from the ranger shed, lower the service bridge, and cross the washout. Reset both breakers and use the relay. Retry between steps to confirm progression persists.
+- Verify that the summit beacon requires the relay. Time a full run from Begin Survival to rescue, including any exploration and retries.
+
 ## Replay variation
 
 - Start two adventures. Check which sled, supply stash, spare fuel, and wolf locations changed. Verify that the early supplies and lookout fuel remain accessible.
 - Retry from a checkpoint and confirm that optional supply locations and the weather pattern stay consistent. Look for the gust warning before the next push.
-- Follow the trail past the first wolf on the logging route, then look for separate wolves beyond the far-bank camp and on the upper ridge. Check that getting past one wolf leaves the later encounters available. Test the lunge warning, lethal bite, torch, and pickaxe. Confirm that retry returns all three wolves to their patrols.
+- Follow the trail past the first wolf on the logging route, then look for separate wolves beyond the far-bank camp, on the upper ridge, on the ranger trail, and in the relay woods. Check that getting past one wolf leaves the later encounters available. Test the lunge warning, lethal bite, torch, and pickaxe. Confirm that retry returns all five wolves to their patrols.
 
 ## Human playtest record (copy for each participant/build)
 
